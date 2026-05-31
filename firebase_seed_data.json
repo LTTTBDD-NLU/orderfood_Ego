@@ -1,0 +1,73 @@
+{
+  "Tables": {
+    "table_01": { "tableId": "table_01", "tableName": "Bàn 01", "status": "EMPTY" },
+    "table_02": { "tableId": "table_02", "tableName": "Bàn 02", "status": "EMPTY" },
+    "table_03": { "tableId": "table_03", "tableName": "Bàn 03", "status": "EMPTY" },
+    "table_04": { "tableId": "table_04", "tableName": "Bàn 04", "status": "EMPTY" },
+    "table_05": { "tableId": "table_05", "tableName": "Bàn 05", "status": "EMPTY" },
+    "table_06": { "tableId": "table_06", "tableName": "Bàn 06", "status": "EMPTY" },
+    "table_07": { "tableId": "table_07", "tableName": "Bàn 07", "status": "EMPTY" },
+    "table_08": { "tableId": "table_08", "tableName": "Bàn 08", "status": "EMPTY" },
+    "table_vip1": { "tableId": "table_vip1", "tableName": "VIP 01", "status": "EMPTY" },
+    "table_vip2": { "tableId": "table_vip2", "tableName": "VIP 02", "status": "EMPTY" }
+  },
+
+  "Menu_Items": {
+    "item_001": {
+      "itemId": "item_001", "categoryId": "cat_main",
+      "itemName": "Cơm tấm sườn bì", "imageUrl": "",
+      "guestPrice": 65000, "memberPrice": 55000, "status": "AVAILABLE"
+    },
+    "item_002": {
+      "itemId": "item_002", "categoryId": "cat_main",
+      "itemName": "Bún bò Huế", "imageUrl": "",
+      "guestPrice": 70000, "memberPrice": 60000, "status": "AVAILABLE"
+    },
+    "item_003": {
+      "itemId": "item_003", "categoryId": "cat_main",
+      "itemName": "Phở bò tái", "imageUrl": "",
+      "guestPrice": 75000, "memberPrice": 65000, "status": "AVAILABLE"
+    },
+    "item_004": {
+      "itemId": "item_004", "categoryId": "cat_drink",
+      "itemName": "Nước ép cam", "imageUrl": "",
+      "guestPrice": 35000, "memberPrice": 28000, "status": "AVAILABLE"
+    },
+    "item_005": {
+      "itemId": "item_005", "categoryId": "cat_drink",
+      "itemName": "Trà đào cam sả", "imageUrl": "",
+      "guestPrice": 40000, "memberPrice": 33000, "status": "AVAILABLE"
+    },
+    "item_006": {
+      "itemId": "item_006", "categoryId": "cat_dessert",
+      "itemName": "Chè khúc bạch", "imageUrl": "",
+      "guestPrice": 45000, "memberPrice": 38000, "status": "OUT_OF_STOCK"
+    }
+  },
+
+  "Users": {
+    "NOTE": "Tạo user qua FirebaseAuth Console, sau đó thêm node Users/{uid} với data sau",
+    "1iywKV7W5ZNB6qMXrM8ZdgQ91dS2": {
+      "user_id": "EXAMPLE_UID_KITCHEN",
+      "full_name": "Nguyễn Văn Bếp",
+      "role": "KITCHEN_STAFF",
+      "status": true
+    },
+    "0UImYMVMOJUA86BnbUJFNLeEPpE2": {
+      "user_id": "EXAMPLE_UID_WAITER",
+      "full_name": "Trần Thị Phục Vụ",
+      "role": "WAITSTAFF",
+      "status": true
+    },
+    "cds8PFqPz3eCpuGi42dKlhKvIPi1": {
+      "user_id": "EXAMPLE_UID_ADMIN",
+      "full_name": "Lê Văn Quản Lý",
+      "role": "ADMIN",
+      "status": true
+    }
+  },
+
+  "Order_Details": {
+    "NOTE": "Dữ liệu này được tạo tự động bởi CartActivity khi khách đặt món"
+  }
+}

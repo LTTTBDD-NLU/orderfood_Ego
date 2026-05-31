@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Prompt 4: Layout item bếp - ảnh tải bằng ExecutorService -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:background="#2D2D2D"
+    android:padding="12dp"
+    android:gravity="center_vertical">
+
+    <!-- Ảnh món ăn - tải từ URL bằng Background Thread -->
+    <ImageView
+        android:id="@+id/iv_kitchen_food_img"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:scaleType="centerCrop"
+        android:background="#3D3D3D"
+        android:layout_marginEnd="12dp"/>
+
+    <!-- Thông tin món -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tv_kitchen_table"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Bàn: --"
+            android:textSize="13sp"
+            android:textColor="#AAAAAA"
+            android:layout_marginBottom="2dp"/>
+
+        <TextView
+            android:id="@+id/tv_kitchen_item_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Tên món"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="@color/white"
+            android:layout_marginBottom="4dp"/>
+
+        <TextView
+            android:id="@+id/tv_kitchen_quantity"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="SL: 1"
+            android:textSize="14sp"
+            android:textColor="@color/colorAccent"
+            android:layout_marginBottom="4dp"/>
+
+        <!-- Ghi chú màu đỏ nổi bật cho bếp -->
+        <TextView
+            android:id="@+id/tv_kitchen_note"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textSize="13sp"
+            android:textColor="@color/note_red"
+            android:textStyle="bold"/>
+    </LinearLayout>
+
+    <!-- 2 nút xử lý đơn -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Prompt 4: onClick -> update status = DELIVERING -->
+        <Button
+            android:id="@+id/btn_done"
+            android:layout_width="100dp"
+            android:layout_height="wrap_content"
+            android:text="✓ Đã xong"
+            android:backgroundTint="@color/staff_active"
+            android:textColor="@color/white"
+            android:textSize="13sp"
+            android:layout_marginBottom="8dp"/>
+
+        <!-- Prompt 4: onClick -> update status = CANCELLED -->
+        <Button
+            android:id="@+id/btn_out_of_stock"
+            android:layout_width="100dp"
+            android:layout_height="wrap_content"
+            android:text="✗ Hết món"
+            android:backgroundTint="@color/colorPrimary"
+            android:textColor="@color/white"
+            android:textSize="13sp"/>
+    </LinearLayout>
+
+</LinearLayout>
