@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:background="@color/white"
+    android:padding="14dp"
+    android:gravity="center_vertical">
+
+    <!-- Chấm màu trạng thái -->
+    <View
+        android:id="@+id/view_status_dot"
+        android:layout_width="12dp"
+        android:layout_height="12dp"
+        android:background="@color/staff_active"
+        android:layout_marginEnd="12dp"/>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tv_staff_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Tên nhân viên"
+            android:textSize="15sp"
+            android:textStyle="bold"/>
+
+        <TextView
+            android:id="@+id/tv_staff_role"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Vai trò"
+            android:textSize="13sp"
+            android:textColor="@color/text_secondary"/>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tv_staff_status_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Hoạt động"
+        android:textSize="12sp"
+        android:textColor="@color/staff_active"
+        android:textStyle="bold"/>
+</LinearLayout>

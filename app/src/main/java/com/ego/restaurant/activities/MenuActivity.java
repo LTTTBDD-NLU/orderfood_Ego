@@ -27,9 +27,9 @@ public class MenuActivity extends AppCompatActivity {
     private EditText  etSearch;
     private Button    btnViewCart;
 
-    private ArrayList<MenuItem> allItems    = new ArrayList<>();
-    private ArrayList<MenuItem> displayItems= new ArrayList<>();
-    private ArrayList<MenuItem> cartItems   = new ArrayList<>();
+    private ArrayList<MenuItem> allItems     = new ArrayList<>();
+    private ArrayList<MenuItem> displayItems = new ArrayList<>();
+    private ArrayList<MenuItem> cartItems    = new ArrayList<>();
     private MenuAdapter menuAdapter;
 
     private String tableId, tableName, role, existingOrderId;
@@ -56,12 +56,12 @@ public class MenuActivity extends AppCompatActivity {
         btnViewCart = findViewById(R.id.btn_view_cart);
         etSearch    = findViewById(R.id.et_search_menu);
 
-        String label = "MEMBER".equals(role) ? "Giá Member ✦" : "Giá vãn lai";
-        String extra = existingOrderId != null ? " (Gọi thêm)" : "";
-        tvTableInfo.setText(tableName + extra + "  —  " + label);
+        String priceLabel = "MEMBER".equals(role) ? "Giá Member ✦" : "Giá vãn lai";
+        String extra      = existingOrderId != null ? " — Gọi thêm" : "";
+        tvTableInfo.setText(tableName + extra + "  |  " + priceLabel);
 
         menuAdapter = new MenuAdapter(this, displayItems, cartItems, role,
-                count -> tvCartCount.setText("Giỏ: " + count));
+                count -> tvCartCount.setText("Giỏ: " + count + " món"));
         lvMenu.setAdapter(menuAdapter);
 
         if (etSearch != null) {
@@ -80,11 +80,11 @@ public class MenuActivity extends AppCompatActivity {
                 return;
             }
             Intent intent = new Intent(this, CartActivity.class);
-            intent.putExtra("cart_items",        cartItems);
-            intent.putExtra("table_number",      tableNumber);
-            intent.putExtra("table_name",        tableName);
-            intent.putExtra("table_id",          tableId);
-            intent.putExtra("role",              role);
+            intent.putExtra("cart_items",   cartItems);
+            intent.putExtra("table_number", tableNumber);
+            intent.putExtra("table_name",   tableName);
+            intent.putExtra("table_id",     tableId);
+            intent.putExtra("role",         role);
             if (existingOrderId != null)
                 intent.putExtra("existing_order_id", existingOrderId);
             startActivity(intent);
@@ -94,6 +94,19 @@ public class MenuActivity extends AppCompatActivity {
         if (tvBack != null) tvBack.setOnClickListener(v -> finish());
 
         loadMenuFromDb();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Kiểm tra nếu đã có đơn active và cart trước đó có data → đây là trường hợp
+        // quay lại từ CartActivity sau khi đã confirm → xóa giỏ
+        SessionManager sm = new SessionManager(this);
+        if (sm.hasActiveOrder() && !cartItems.isEmpty()) {
+            cartItems.clear();
+            tvCartCount.setText("Giỏ: 0 món");
+            menuAdapter.notifyDataSetChanged();
+        }
     }
 
     private void loadMenuFromDb() {
@@ -118,7 +131,8 @@ public class MenuActivity extends AppCompatActivity {
         menuAdapter.notifyDataSetChanged();
     }
 
-    @Override protected void onDestroy() {
+    @Override
+    protected void onDestroy() {
         super.onDestroy();
         if (menuAdapter != null) menuAdapter.shutdown();
     }

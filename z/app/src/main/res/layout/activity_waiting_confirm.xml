@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background_light">
+
+    <!-- Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="@color/colorPrimary"
+        android:padding="16dp"
+        android:gravity="center_vertical">
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="EGO Restaurant"
+            android:textColor="@color/white"
+            android:textSize="18sp"
+            android:textStyle="bold"/>
+    </LinearLayout>
+
+    <!-- Nội dung chờ -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="32dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="⏳"
+            android:textSize="72sp"
+            android:gravity="center"
+            android:layout_marginBottom="24dp"/>
+
+        <TextView
+            android:id="@+id/tv_table_info"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Bàn --"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:textColor="@color/colorPrimary"
+            android:gravity="center"
+            android:layout_marginBottom="12dp"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Đang chờ nhân viên xác nhận bàn"
+            android:textSize="18sp"
+            android:textColor="#212121"
+            android:gravity="center"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Nhân viên sẽ kiểm tra và xác nhận bàn của bạn.\nSau khi xác nhận, bạn có thể gọi thêm món."
+            android:textSize="14sp"
+            android:textColor="@color/text_secondary"
+            android:gravity="center"
+            android:layout_marginBottom="40dp"/>
+
+        <!-- Danh sách món đã đặt (rút gọn) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@color/white"
+            android:padding="16dp"
+            android:elevation="4dp"
+            android:layout_marginBottom="24dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Đơn hàng vừa đặt:"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="#212121"
+                android:layout_marginBottom="8dp"/>
+
+            <TextView
+                android:id="@+id/tv_order_summary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="..."
+                android:textSize="13sp"
+                android:textColor="#424242"/>
+
+            <View android:layout_width="match_parent" android:layout_height="1dp"
+                android:background="@color/background_light" android:layout_marginVertical="8dp"/>
+
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="horizontal">
+                <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_weight="1" android:text="Tổng cộng:"
+                    android:textSize="14sp" android:textStyle="bold"/>
+                <TextView android:id="@+id/tv_order_total"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="0 đ" android:textSize="16sp" android:textStyle="bold"
+                    android:textColor="@color/colorPrimary"/>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Spinner loading -->
+        <ProgressBar
+            android:id="@+id/progress_waiting"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:indeterminateTint="@color/colorPrimary"/>
+
+        <TextView
+            android:id="@+id/tv_status_update"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Đang chờ..."
+            android:textSize="13sp"
+            android:textColor="@color/colorPrimary"
+            android:gravity="center"
+            android:layout_marginTop="8dp"/>
+    </LinearLayout>
+
+    <!-- Nút hủy đơn (nếu muốn) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/white"
+        android:padding="16dp"
+        android:elevation="6dp">
+
+        <Button
+            android:id="@+id/btn_cancel_order"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="HỦY ĐƠN"
+            android:backgroundTint="@color/background_light"
+            android:textColor="@color/colorPrimary"
+            android:padding="14dp"
+            android:layout_marginEnd="8dp"/>
+
+        <Button
+            android:id="@+id/btn_view_tracking"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="2"
+            android:text="THEO DÕI CHI TIẾT"
+            android:backgroundTint="@color/colorPrimary"
+            android:textColor="@color/white"
+            android:padding="14dp"/>
+    </LinearLayout>
+</LinearLayout>

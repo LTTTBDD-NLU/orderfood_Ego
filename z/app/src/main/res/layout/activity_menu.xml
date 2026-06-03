@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background_light">
+
+    <!-- Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="@color/colorPrimary"
+        android:padding="14dp"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/tv_back_from_menu"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="←"
+            android:textColor="@color/white"
+            android:textSize="22sp"
+            android:paddingEnd="14dp"/>
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Thực Đơn"
+            android:textColor="@color/white"
+            android:textSize="18sp"
+            android:textStyle="bold"/>
+
+        <TextView
+            android:id="@+id/tv_cart_count"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Giỏ: 0"
+            android:textColor="@color/white"
+            android:textSize="13sp"
+            android:layout_marginEnd="10dp"/>
+
+        <Button
+            android:id="@+id/btn_view_cart"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Xem giỏ"
+            android:backgroundTint="@color/colorAccent"
+            android:textColor="@color/white"
+            android:textSize="12sp"/>
+    </LinearLayout>
+
+    <!-- Info bàn + vai trò giá -->
+    <TextView
+        android:id="@+id/tv_table_info"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Bàn --  —  Giá vãn lai"
+        android:textSize="13sp"
+        android:textColor="@color/white"
+        android:background="@color/colorAccent"
+        android:padding="8dp"
+        android:paddingStart="16dp"/>
+
+    <!-- Ô tìm kiếm -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/white"
+        android:padding="10dp">
+        <EditText
+            android:id="@+id/et_search_menu"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="🔍  Tìm kiếm món ăn..."
+            android:padding="10dp"
+            android:background="@color/background_light"
+            android:textSize="14sp"/>
+    </LinearLayout>
+
+    <!-- Danh sách món -->
+    <ListView
+        android:id="@+id/lv_menu"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:divider="@android:color/transparent"
+        android:dividerHeight="6dp"
+        android:padding="6dp"/>
+</LinearLayout>

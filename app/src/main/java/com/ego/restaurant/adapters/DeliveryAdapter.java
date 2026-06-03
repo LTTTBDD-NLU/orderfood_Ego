@@ -20,7 +20,7 @@ public class DeliveryAdapter extends BaseAdapter {
         void onDelivered(OrderDetail detail);
     }
 
-    private final Context context;
+    private final Context                context;
     private final ArrayList<OrderDetail> orders;
     private final OnDeliveryDoneListener listener;
 
@@ -31,44 +31,45 @@ public class DeliveryAdapter extends BaseAdapter {
         this.listener = listener;
     }
 
-    @Override
-    public int getCount()          {
-        return orders.size();
-    }
-
-    @Override
-    public Object getItem(int pos) {
-        return orders.get(pos);
-    }
-
-    @Override
-    public long getItemId(int pos) {
-        return pos;
-    }
+    @Override public int    getCount()         { return orders.size(); }
+    @Override public Object getItem(int pos)   { return orders.get(pos); }
+    @Override public long   getItemId(int pos) { return pos; }
 
     @Override
     public View getView(int position, View convertView, ViewGroup parent) {
+        ViewHolder h;
         if (convertView == null) {
             convertView = LayoutInflater.from(context)
                     .inflate(R.layout.item_delivery_order, parent, false);
+            h           = new ViewHolder();
+            h.tvTable   = convertView.findViewById(R.id.tv_delivery_table);
+            h.tvItem    = convertView.findViewById(R.id.tv_delivery_item);
+            h.tvQty     = convertView.findViewById(R.id.tv_delivery_qty);
+            h.btnDone   = convertView.findViewById(R.id.btn_delivery_done);
+            convertView.setTag(h);
+        } else {
+            h = (ViewHolder) convertView.getTag();
         }
 
-        OrderDetail detail = orders.get(position);
+        OrderDetail d = orders.get(position);
+        h.tvTable.setText("Bàn: " + (d.getTableName() != null ? d.getTableName() : "--"));
 
-        TextView tvTable = convertView.findViewById(R.id.tv_delivery_table);
-        TextView tvItem  = convertView.findViewById(R.id.tv_delivery_item);
-        TextView tvQty   = convertView.findViewById(R.id.tv_delivery_qty);
-        Button btnDone   = convertView.findViewById(R.id.btn_delivery_done);
+        // Gộp tên món + ghi chú vào tv_delivery_item (không có tv_delivery_note trong layout)
+        String itemText = d.getItemName();
+        if (d.getNote() != null && !d.getNote().isEmpty())
+            itemText += "\n📝 " + d.getNote();
+        h.tvItem.setText(itemText);
+        h.tvQty.setText("x" + d.getQuantity());
 
-        tvTable.setText("Bàn: " + detail.getTableName());
-        tvItem.setText(detail.getItemName());
-        tvQty.setText("x" + detail.getQuantity());
-
-        // Nhân viên xác nhận đã mang lên bàn -> COMPLETED
-        btnDone.setOnClickListener(v -> {
+        final OrderDetail detail = d;
+        h.btnDone.setOnClickListener(v -> {
             if (listener != null) listener.onDelivered(detail);
         });
-
         return convertView;
+    }
+
+    static class ViewHolder {
+        TextView tvTable, tvItem, tvQty;
+        Button   btnDone;
     }
 }

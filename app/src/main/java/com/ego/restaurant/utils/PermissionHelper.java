@@ -44,14 +44,20 @@ public class PermissionHelper {
         ROLE_PERMISSIONS.put("ADMIN", new HashSet<>(Arrays.asList(
                 VIEW_TABLE, ORDER_FOR_CUSTOMER, VERIFY_GUEST_ORDER,
                 PROCESS_PAYMENT, REGISTER_OWN_SHIFT,
-                MANAGE_STAFF_SCHEDULE, MANAGE_STAFF_ACCOUNT
+                MANAGE_STAFF_SCHEDULE,   // xếp ca cho WAITSTAFF/KITCHEN
+                MANAGE_STAFF_ACCOUNT     // tạo/khóa WAITSTAFF/KITCHEN
+                // KHÔNG có MANAGE_ADMIN_ACCOUNT → không tạo được ADMIN khác
+                // KHÔNG có MANAGE_ADMIN_SCHEDULE → không xếp ca cho ADMIN
         )));
         ROLE_PERMISSIONS.put("SUPERADMIN", new HashSet<>(Arrays.asList(
                 VIEW_TABLE, ORDER_FOR_CUSTOMER, VERIFY_GUEST_ORDER,
                 PROCESS_PAYMENT, REGISTER_OWN_SHIFT,
-                MANAGE_ADMIN_SCHEDULE, MANAGE_STAFF_SCHEDULE,
-                MANAGE_ADMIN_ACCOUNT, MANAGE_STAFF_ACCOUNT,
-                MANAGE_MENU_CATALOG, VIEW_REVENUE_REPORT
+                MANAGE_ADMIN_SCHEDULE,
+                MANAGE_STAFF_SCHEDULE,
+                MANAGE_ADMIN_ACCOUNT,
+                MANAGE_STAFF_ACCOUNT,
+                MANAGE_MENU_CATALOG,
+                VIEW_REVENUE_REPORT
         )));
     }
 

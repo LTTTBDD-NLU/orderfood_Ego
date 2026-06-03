@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Màn hình 5: Force Logout Modal -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@color/white"
+    android:padding="24dp"
+    android:gravity="center">
+
+    <TextView
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:text="🔒"
+        android:textSize="40sp"
+        android:gravity="center"
+        android:layout_marginBottom="16dp"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Phiên đăng nhập hết hạn"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="#D32F2F"
+        android:layout_marginBottom="12dp"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Phiên đăng nhập đã hết hạn hoặc tài khoản bị vô hiệu hóa. Vui lòng đăng nhập lại."
+        android:textSize="14sp"
+        android:textColor="@color/text_secondary"
+        android:gravity="center"
+        android:layout_marginBottom="24dp"/>
+
+    <Button
+        android:id="@+id/btn_go_login"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="QUAY VỀ ĐĂNG NHẬP"
+        android:backgroundTint="@color/colorPrimary"
+        android:textColor="@color/white"
+        android:padding="14dp"/>
+</LinearLayout>

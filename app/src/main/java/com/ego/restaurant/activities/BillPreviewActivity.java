@@ -22,6 +22,7 @@ import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 
 public class BillPreviewActivity extends AppCompatActivity {
@@ -30,16 +31,20 @@ public class BillPreviewActivity extends AppCompatActivity {
     private ListView lvBillItems;
     private Button   btnPaymentSuccess;
 
-    private String tableId, tableName;
-    private String orderId;
+    private String        tableId, tableName;
+    private String        primaryOrderId; // orderId từ intent (có thể null)
+    private List<String>  allOrderIds = new ArrayList<>(); // Bug #3 FIX
+
+    private double currentSubtotal = 0;
+    private double currentTotal    = 0;
+    private boolean isMemberOrder  = false;
 
     private ArrayList<OrderDetail> billItems = new ArrayList<>();
     private BillItemAdapter        billAdapter;
 
     private final Handler  handler  = new Handler(Looper.getMainLooper());
     private final Runnable pollTask = new Runnable() {
-        @Override
-        public void run() {
+        @Override public void run() {
             loadBill();
             handler.postDelayed(this, 3000);
         }
@@ -50,9 +55,9 @@ public class BillPreviewActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_bill_preview);
 
-        orderId   = getIntent().getStringExtra("order_id");
-        tableId   = getIntent().getStringExtra("table_id");
-        tableName = getIntent().getStringExtra("table_name");
+        primaryOrderId = getIntent().getStringExtra("order_id");
+        tableId        = getIntent().getStringExtra("table_id");
+        tableName      = getIntent().getStringExtra("table_name");
 
         tvBillTable       = findViewById(R.id.tv_bill_table);
         tvBillTime        = findViewById(R.id.tv_bill_time);
@@ -69,80 +74,147 @@ public class BillPreviewActivity extends AppCompatActivity {
         billAdapter = new BillItemAdapter(this, billItems);
         lvBillItems.setAdapter(billAdapter);
 
-        if (orderId == null && tableId != null) {
-            Order o = DatabaseHelper.getInstance(this).getActiveOrderByTable(tableId);
-            if (o != null) orderId = o.getOrderId();
-        }
-
         btnPaymentSuccess.setOnClickListener(v -> confirmPayment());
         findViewById(R.id.tv_back).setOnClickListener(v -> finish());
 
         handler.post(pollTask);
     }
 
+    /**
+     * Bug #3 FIX: tải TẤT CẢ đơn active của bàn, không chỉ một orderId
+     * Bug #22 FIX: đọc chiết khấu từ DB, không hard-code 10%
+     */
     private void loadBill() {
-        if (orderId == null) {
+        DatabaseHelper db = DatabaseHelper.getInstance(this);
+
+        // ── Bước 1: Thu thập tất cả đơn active của bàn ───────────────
+        ArrayList<Order> activeOrders = new ArrayList<>();
+
+        if (tableId != null && !tableId.isEmpty()) {
+            // Lấy tất cả đơn còn active của bàn
+            activeOrders = db.getAllActiveOrdersByTable(tableId);
+        } else if (primaryOrderId != null) {
+            // Chỉ có orderId đơn lẻ (không biết bàn)
+            Order single = db.getOrderById(primaryOrderId);
+            if (single != null) activeOrders.add(single);
+        }
+
+        // Nếu không tìm thấy qua tableId nhưng có primaryOrderId, thêm vào
+        if (activeOrders.isEmpty() && primaryOrderId != null) {
+            Order single = db.getOrderById(primaryOrderId);
+            if (single != null) activeOrders.add(single);
+        }
+
+        if (activeOrders.isEmpty()) {
             tvBillTable.setText(tableName != null ? tableName : "Bàn --");
-            tvTotalBill.setText("Không tìm thấy đơn");
+            tvTotalBill.setText("Không tìm thấy đơn hàng");
             return;
         }
 
-        Order o = DatabaseHelper.getInstance(this).getOrderById(orderId);
-        if (o == null) return;
-
+        // ── Bước 2: Gộp tất cả items từ mọi đơn ─────────────────────
         billItems.clear();
+        allOrderIds.clear();
         double subtotal = 0;
-        for (OrderDetail d : o.getItems()) {
-            if ("CANCELLED".equals(d.getStatus())) continue;
-            billItems.add(d);
-            subtotal += d.getUnitPrice() * d.getQuantity();
+        boolean hasMember = false;
+        Order   firstOrder = activeOrders.get(0);
+
+        for (Order o : activeOrders) {
+            allOrderIds.add(o.getOrderId());
+            if ("MEMBER".equals(o.getRoleCode())) hasMember = true;
+            for (OrderDetail d : o.getItems()) {
+                if ("CANCELLED".equals(d.getStatus())) continue;
+                billItems.add(d);
+                subtotal += d.getUnitPrice() * d.getQuantity();
+            }
         }
 
-        boolean isMember = "MEMBER".equals(o.getRoleCode());
-        double discount  = isMember ? subtotal * 0.10 : 0;
-        double total     = subtotal - discount;
+        // primaryOrderId dùng để thanh toán nếu chỉ có một đơn
+        if (primaryOrderId == null && !allOrderIds.isEmpty())
+            primaryOrderId = allOrderIds.get(allOrderIds.size() - 1);
 
+        isMemberOrder = hasMember;
+
+        // ── Bước 3: Chiết khấu từ DB (Bug #22 FIX) ───────────────────
+        double discountPct = hasMember ? db.getActiveMemberDiscountPercent() : 0;
+        double discount    = subtotal * discountPct / 100.0;
+        double total       = subtotal - discount;
+
+        currentSubtotal = subtotal;
+        currentTotal    = total;
+
+        // ── Bước 4: Cập nhật UI ───────────────────────────────────────
         NumberFormat nf  = NumberFormat.getNumberInstance(Locale.forLanguageTag("vi"));
         SimpleDateFormat sdf = new SimpleDateFormat("HH:mm dd/MM/yyyy", Locale.getDefault());
 
-        tvBillTable.setText("Bàn: " + (o.getTableName() != null ? o.getTableName() : tableName));
-        tvBillTime.setText("Mở bàn: " + sdf.format(new Date(o.getCreatedAt())));
-        tvSubtotal.setText(nf.format((long) subtotal) + " đ");
-        tvDiscount.setText("- " + nf.format((long) discount) + " đ");
-        tvTotalBill.setText(nf.format((long) total) + " đ");
+        String displayTable = firstOrder.getTableName() != null && !firstOrder.getTableName().isEmpty()
+                ? firstOrder.getTableName()
+                : (tableName != null ? tableName : "Bàn --");
 
+        tvBillTable.setText("Bàn: " + displayTable);
+        tvBillTime.setText("Mở bàn: " + sdf.format(new Date(firstOrder.getCreatedAt())));
+        tvSubtotal.setText(nf.format((long) subtotal) + " đ");
+
+        if (discount > 0) {
+            tvDiscount.setText("- " + nf.format((long) discount) + " đ"
+                    + "  (thành viên " + (int) discountPct + "%)");
+        } else {
+            tvDiscount.setText("0 đ");
+        }
+        tvTotalBill.setText(nf.format((long) total) + " đ");
         billAdapter.notifyDataSetChanged();
     }
 
     private void confirmPayment() {
-        if (orderId == null) return;
-        Order o = DatabaseHelper.getInstance(this).getOrderById(orderId);
-        if (o == null) return;
-
-        double subtotal = 0;
-        for (OrderDetail d : o.getItems()) {
-            if ("CANCELLED".equals(d.getStatus())) continue;
-            subtotal += d.getUnitPrice() * d.getQuantity();
+        if (allOrderIds.isEmpty() && primaryOrderId == null) {
+            Toast.makeText(this, "Không tìm thấy đơn hàng", Toast.LENGTH_SHORT).show();
+            return;
         }
-        boolean isMember = "MEMBER".equals(o.getRoleCode());
-        double  total    = isMember ? subtotal * 0.90 : subtotal;
-        NumberFormat nf  = NumberFormat.getNumberInstance(Locale.forLanguageTag("vi"));
+        // Recalc để đảm bảo số mới nhất
+        loadBill();
+
+        NumberFormat nf = NumberFormat.getNumberInstance(Locale.forLanguageTag("vi"));
+        String msg = "Tổng: " + nf.format((long) currentTotal) + " đ"
+                + (isMemberOrder ? "\n(Đã áp dụng chiết khấu thành viên)" : "")
+                + "\n\nKhách đã trả đủ?";
 
         new AlertDialog.Builder(this)
                 .setTitle("Xác nhận thanh toán")
-                .setMessage("Tổng: " + nf.format((long) total) + " đ\n\nKhách đã trả đủ?")
-                .setPositiveButton("THANH TOÁN THÀNH CÔNG", (d, w) -> processPayment(total))
+                .setMessage(msg)
+                .setPositiveButton("THANH TOÁN THÀNH CÔNG", (d, w) -> processPayment())
                 .setNegativeButton("Huỷ", null)
                 .show();
     }
 
-    private void processPayment(double total) {
+    /**
+     * Bug #17 FIX: lưu số tiền THỰC SỰ thu (sau chiết khấu) vào DB
+     * Bug #3  FIX: đánh dấu PAID cho TẤT CẢ các đơn của bàn
+     */
+    private void processPayment() {
         handler.removeCallbacks(pollTask);
         DatabaseHelper db = DatabaseHelper.getInstance(this);
-        db.updateOrderStatus(orderId, "PAID");
-        db.updateTableStatus(tableId != null ? tableId : "", "EMPTY");
-        db.setTableCurrentOrder(tableId != null ? tableId : "", "");
-        Toast.makeText(this, "✅ Thanh toán thành công! Bàn đã được giải phóng.", Toast.LENGTH_LONG).show();
+
+        if (allOrderIds.size() > 1) {
+            // Nhiều đơn → chia đều tổng thực thu
+            db.finalizePaymentMultiple(allOrderIds, currentTotal);
+        } else {
+            // Một đơn → ghi chính xác
+            String oid = allOrderIds.isEmpty() ? primaryOrderId : allOrderIds.get(0);
+            db.finalizePayment(oid, currentTotal);
+        }
+
+        // Giải phóng bàn
+        if (tableId != null && !tableId.isEmpty()) {
+            db.updateTableStatus(tableId, "EMPTY");
+            db.setTableCurrentOrder(tableId, "");
+        }
+
+        // Xóa active order trong session (Bug #42)
+        new com.ego.restaurant.utils.SessionManager(this).clearActiveOrder();
+
+        NumberFormat nf = NumberFormat.getNumberInstance(Locale.forLanguageTag("vi"));
+        Toast.makeText(this,
+                "✅ Thanh toán thành công! " + nf.format((long) currentTotal) + " đ — Bàn đã giải phóng.",
+                Toast.LENGTH_LONG).show();
         finish();
     }
 

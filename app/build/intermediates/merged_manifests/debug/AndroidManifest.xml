@@ -12,7 +12,8 @@
         android:name="com.ego.restaurant.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
         android:protectionLevel="signature" />
 
-    <uses-permission android:name="com.ego.restaurant.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" /> <!-- Không cần INTERNET - SQLite local only -->
+    <uses-permission android:name="com.ego.restaurant.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+
     <application
         android:allowBackup="true"
         android:appComponentFactory="androidx.core.app.CoreComponentFactory"

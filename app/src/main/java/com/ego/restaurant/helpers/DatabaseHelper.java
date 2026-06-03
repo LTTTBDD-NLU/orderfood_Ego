@@ -21,7 +21,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     private static final String TAG = "DatabaseHelper";
     public  static final String DB_NAME    = "ego_restaurant.db";
-    private static final int    DB_VERSION = 2;
+    private static final int    DB_VERSION = 3; // tăng version để trigger onUpgrade
 
     public static final String T_USERS   = "Users";
     public static final String U_ID      = "id";
@@ -168,6 +168,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 P_TARGET + " TEXT DEFAULT 'MEMBER'," +
                 P_ACTIVE + " INTEGER DEFAULT 1)");
 
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_details_status ON " + T_DETAILS + "(" + D_STATUS + ")");
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_details_order ON "  + T_DETAILS + "(" + D_ORDER  + ")");
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_orders_table ON "   + T_ORDERS  + "(" + O_TABLE  + ")");
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_orders_status ON "  + T_ORDERS  + "(" + O_STATUS + ")");
+
         seedInitialData(db);
         Log.d(TAG, "onCreate: tất cả bảng đã tạo + seed dữ liệu mẫu");
     }
@@ -180,14 +185,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     }
 
     private void seedInitialData(SQLiteDatabase db) {
-        // Admin mặc định
-        insertUser(db, "Quản lý EGO",   "admin@ego.vn",   "0900000001", "admin123",   "ADMIN",         1);
-        insertUser(db, "Super Admin",    "super@ego.vn",   "0900000000", "super123",   "SUPERADMIN",    1);
-        insertUser(db, "Nguyễn Phục Vụ","waiter@ego.vn",  "0911111111", "waiter123",  "WAITSTAFF",     1);
-        insertUser(db, "Trần Đầu Bếp",  "kitchen@ego.vn", "0922222222", "kitchen123", "KITCHEN_STAFF", 1);
-        insertUser(db, "Lê Thành Viên", "member@ego.vn",  "0933333333", "member123",  "MEMBER",        1);
+        insertUser(db, "Quản lý EGO",    "admin@ego.vn",   "0900000001", "admin123",   "ADMIN",         1);
+        insertUser(db, "Super Admin",     "super@ego.vn",   "0900000000", "super123",   "SUPERADMIN",    1);
+        insertUser(db, "Nguyễn Phục Vụ", "waiter@ego.vn",  "0911111111", "waiter123",  "WAITSTAFF",     1);
+        insertUser(db, "Trần Đầu Bếp",   "kitchen@ego.vn", "0922222222", "kitchen123", "KITCHEN_STAFF", 1);
+        insertUser(db, "Lê Thành Viên",  "member@ego.vn",  "0933333333", "member123",  "MEMBER",        1);
 
-        // 16 bàn
         for (int i = 1; i <= 16; i++) {
             String id = String.format("T%02d", i);
             ContentValues cv = new ContentValues();
@@ -196,7 +199,6 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             db.insert(T_TABLES, null, cv);
         }
 
-        // 16 món ăn mẫu
         String[][] menu = {
             {"Phở bò đặc biệt",    "Món chính",   "85000",  "75000"},
             {"Bún bò Huế",         "Món chính",   "75000",  "65000"},
@@ -226,10 +228,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             db.insert(T_MENU, null, cv);
         }
 
-        // Khuyến mãi mặc định
         ContentValues p1 = new ContentValues();
-        p1.put(P_NAME,"Ưu đãi thành viên"); p1.put(P_DISC,10.0);
-        p1.put(P_TARGET,"MEMBER"); p1.put(P_ACTIVE,1);
+        p1.put(P_NAME, "Ưu đãi thành viên"); p1.put(P_DISC, 10.0);
+        p1.put(P_TARGET, "MEMBER"); p1.put(P_ACTIVE, 1);
         db.insert(T_PROMO, null, p1);
     }
 
@@ -266,10 +267,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         SQLiteDatabase db = getWritableDatabase();
         ContentValues cv = new ContentValues();
         cv.put(U_NAME, name); cv.put(U_EMAIL, email); cv.put(U_PHONE, phone);
-        cv.put(U_PWD,  password); cv.put(U_ROLE, "MEMBER"); cv.put(U_STATUS, 1);
+        cv.put(U_PWD, password); cv.put(U_ROLE, "MEMBER"); cv.put(U_STATUS, 1);
         long id = -1;
         try { id = db.insertOrThrow(T_USERS, null, cv); }
-        catch (android.database.sqlite.SQLiteConstraintException e) { id = -2; } // email trùng
+        catch (android.database.sqlite.SQLiteConstraintException e) { id = -2; }
         db.close();
         return id;
     }
@@ -309,12 +310,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     public long insertStaff(String name, String role) {
         SQLiteDatabase db = getWritableDatabase();
         ContentValues cv = new ContentValues();
-        cv.put(U_NAME, name); cv.put(U_EMAIL, name.replaceAll("\\s","").toLowerCase()
+        cv.put(U_NAME, name);
+        cv.put(U_EMAIL, name.replaceAll("\\s", "").toLowerCase()
                 + System.currentTimeMillis() + "@ego.vn");
-        cv.put(U_PHONE,""); cv.put(U_PWD,"ego@1234");
-        cv.put(U_ROLE, role); cv.put(U_STATUS,1);
+        cv.put(U_PHONE, ""); cv.put(U_PWD, "ego@1234");
+        cv.put(U_ROLE, role); cv.put(U_STATUS, 1);
         long id = db.insert(T_USERS, null, cv);
-        db.close(); return id;
+        db.close();
+        return id;
     }
 
     public int updateStaffStatus(int staffId, int newStatus) {
@@ -322,8 +325,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         ContentValues cv = new ContentValues();
         cv.put(U_STATUS, newStatus);
         int rows = db.update(T_USERS, cv, U_ID + "=?", new String[]{String.valueOf(staffId)});
-        db.close(); return rows;
+        db.close();
+        return rows;
     }
+
 
     public ArrayList<Table> getAllTables() {
         ArrayList<Table> list = new ArrayList<>();
@@ -341,19 +346,41 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     }
 
     public void updateTableStatus(String tableId, String status) {
+        if (tableId == null || tableId.isEmpty()) return;
         SQLiteDatabase db = getWritableDatabase();
         ContentValues cv = new ContentValues();
         cv.put(TB_STATUS, status);
+        if ("EMPTY".equals(status)) cv.put(TB_ORD, "");
         db.update(T_TABLES, cv, TB_ID + "=?", new String[]{tableId});
         db.close();
     }
 
     public void setTableCurrentOrder(String tableId, String orderId) {
+        if (tableId == null || tableId.isEmpty()) return;
         SQLiteDatabase db = getWritableDatabase();
         ContentValues cv = new ContentValues();
-        cv.put(TB_ORD, orderId);
+        cv.put(TB_ORD, orderId != null ? orderId : "");
         db.update(T_TABLES, cv, TB_ID + "=?", new String[]{tableId});
         db.close();
+    }
+
+        public boolean tableExists(String tableId) {
+        SQLiteDatabase db = getReadableDatabase();
+        Cursor c = db.rawQuery("SELECT 1 FROM " + T_TABLES + " WHERE " + TB_ID + "=?",
+                new String[]{tableId});
+        boolean exists = c.moveToFirst();
+        c.close(); db.close();
+        return exists;
+    }
+
+    public int countWaitingPaymentTables() {
+        SQLiteDatabase db = getReadableDatabase();
+        Cursor c = db.rawQuery("SELECT COUNT(*) FROM " + T_TABLES +
+                " WHERE " + TB_STATUS + "='WAITING_PAYMENT'", null);
+        int count = 0;
+        if (c.moveToFirst()) count = c.getInt(0);
+        c.close(); db.close();
+        return count;
     }
 
     public ArrayList<MenuItem> getAvailableMenu() {
@@ -361,17 +388,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         SQLiteDatabase db = getReadableDatabase();
         Cursor c = db.rawQuery("SELECT * FROM " + T_MENU +
                 " WHERE " + M_STATUS + "='AVAILABLE' ORDER BY " + M_CAT + "," + M_NAME, null);
-        while (c.moveToNext()) {
-            MenuItem m = new MenuItem();
-            m.setItemId(c.getString(c.getColumnIndexOrThrow(M_ID)));
-            m.setItemName(c.getString(c.getColumnIndexOrThrow(M_NAME)));
-            m.setCategoryId(c.getString(c.getColumnIndexOrThrow(M_CAT)));
-            m.setImageUrl(c.getString(c.getColumnIndexOrThrow(M_IMG)));
-            m.setGuestPrice(c.getDouble(c.getColumnIndexOrThrow(M_GPRICE)));
-            m.setMemberPrice(c.getDouble(c.getColumnIndexOrThrow(M_MPRICE)));
-            m.setStatus(c.getString(c.getColumnIndexOrThrow(M_STATUS)));
-            list.add(m);
-        }
+        while (c.moveToNext()) list.add(cursorToMenuItem(c));
         c.close(); db.close();
         return list;
     }
@@ -380,37 +397,40 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         ArrayList<MenuItem> list = new ArrayList<>();
         SQLiteDatabase db = getReadableDatabase();
         Cursor c = db.rawQuery("SELECT * FROM " + T_MENU + " ORDER BY " + M_CAT + "," + M_NAME, null);
-        while (c.moveToNext()) {
-            MenuItem m = new MenuItem();
-            m.setItemId(c.getString(c.getColumnIndexOrThrow(M_ID)));
-            m.setItemName(c.getString(c.getColumnIndexOrThrow(M_NAME)));
-            m.setCategoryId(c.getString(c.getColumnIndexOrThrow(M_CAT)));
-            m.setImageUrl(c.getString(c.getColumnIndexOrThrow(M_IMG)));
-            m.setGuestPrice(c.getDouble(c.getColumnIndexOrThrow(M_GPRICE)));
-            m.setMemberPrice(c.getDouble(c.getColumnIndexOrThrow(M_MPRICE)));
-            m.setStatus(c.getString(c.getColumnIndexOrThrow(M_STATUS)));
-            list.add(m);
-        }
+        while (c.moveToNext()) list.add(cursorToMenuItem(c));
         c.close(); db.close();
         return list;
+    }
+
+    private MenuItem cursorToMenuItem(Cursor c) {
+        MenuItem m = new MenuItem();
+        m.setItemId(c.getString(c.getColumnIndexOrThrow(M_ID)));
+        m.setItemName(c.getString(c.getColumnIndexOrThrow(M_NAME)));
+        m.setCategoryId(c.getString(c.getColumnIndexOrThrow(M_CAT)));
+        m.setImageUrl(c.getString(c.getColumnIndexOrThrow(M_IMG)));
+        m.setGuestPrice(c.getDouble(c.getColumnIndexOrThrow(M_GPRICE)));
+        m.setMemberPrice(c.getDouble(c.getColumnIndexOrThrow(M_MPRICE)));
+        m.setStatus(c.getString(c.getColumnIndexOrThrow(M_STATUS)));
+        return m;
     }
 
     public long insertMenuItem(String name, String cat, String img, double gp, double mp) {
         SQLiteDatabase db = getWritableDatabase();
         ContentValues cv = new ContentValues();
-        cv.put(M_ID, UUID.randomUUID().toString()); cv.put(M_NAME,name);
-        cv.put(M_CAT,cat); cv.put(M_IMG,img);
-        cv.put(M_GPRICE,gp); cv.put(M_MPRICE,mp); cv.put(M_STATUS,"AVAILABLE");
+        cv.put(M_ID, UUID.randomUUID().toString()); cv.put(M_NAME, name);
+        cv.put(M_CAT, cat); cv.put(M_IMG, img);
+        cv.put(M_GPRICE, gp); cv.put(M_MPRICE, mp); cv.put(M_STATUS, "AVAILABLE");
         long r = db.insert(T_MENU, null, cv);
-        db.close(); return r;
+        db.close();
+        return r;
     }
 
     public void updateMenuItem(String itemId, String name, String cat,
                                 String img, double gp, double mp) {
         SQLiteDatabase db = getWritableDatabase();
         ContentValues cv = new ContentValues();
-        cv.put(M_NAME,name); cv.put(M_CAT,cat); cv.put(M_IMG,img);
-        cv.put(M_GPRICE,gp); cv.put(M_MPRICE,mp);
+        cv.put(M_NAME, name); cv.put(M_CAT, cat); cv.put(M_IMG, img);
+        cv.put(M_GPRICE, gp); cv.put(M_MPRICE, mp);
         db.update(T_MENU, cv, M_ID + "=?", new String[]{itemId});
         db.close();
     }
@@ -426,23 +446,27 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     public String createOrder(String tableId, String tableName, String userId, String role) {
         String orderId = UUID.randomUUID().toString();
         SQLiteDatabase db = getWritableDatabase();
+
         ContentValues cv = new ContentValues();
         cv.put(O_ID,      orderId);   cv.put(O_TABLE,   tableId);
-        cv.put(O_TNAME,   tableName); cv.put(O_USER,    userId);
+        cv.put(O_TNAME,   tableName); cv.put(O_USER,    userId != null ? userId : "");
         cv.put(O_ROLE,    role);      cv.put(O_STATUS,  "IN_PROGRESS");
         cv.put(O_TOTAL,   0.0);       cv.put(O_CREATED, System.currentTimeMillis());
         cv.put(O_PAID,    0L);
         db.insert(T_ORDERS, null, cv);
-        // Đánh dấu bàn
+
+        // Đánh dấu bàn OCCUPIED
         ContentValues tv = new ContentValues();
-        tv.put(TB_STATUS, "MEMBER".equals(role) ? "OCCUPIED" : "OCCUPIED");
-        tv.put(TB_ORD,    orderId);
+        tv.put(TB_STATUS, "OCCUPIED");
+        tv.put(TB_ORD, orderId);
         db.update(T_TABLES, tv, TB_ID + "=?", new String[]{tableId});
+
         db.close();
         return orderId;
     }
 
     public Order getActiveOrderByTable(String tableId) {
+        if (tableId == null) return null;
         SQLiteDatabase db = getReadableDatabase();
         Cursor c = db.rawQuery("SELECT * FROM " + T_ORDERS +
                 " WHERE " + O_TABLE + "=? AND " + O_STATUS + " NOT IN ('PAID','CANCELLED')" +
@@ -457,7 +481,26 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         return o;
     }
 
+    public ArrayList<Order> getAllActiveOrdersByTable(String tableId) {
+        ArrayList<Order> list = new ArrayList<>();
+        if (tableId == null) return list;
+        SQLiteDatabase db = getReadableDatabase();
+        Cursor c = db.rawQuery("SELECT * FROM " + T_ORDERS +
+                " WHERE " + O_TABLE + "=? AND " + O_STATUS + " NOT IN ('PAID','CANCELLED')" +
+                " ORDER BY " + O_CREATED + " ASC",
+                new String[]{tableId});
+        while (c.moveToFirst()) {
+            Order o = cursorToOrder(c);
+            o.setItems(getOrderDetails(db, o.getOrderId()));
+            list.add(o);
+            if (!c.moveToNext()) break;
+        }
+        c.close(); db.close();
+        return list;
+    }
+
     public Order getOrderById(String orderId) {
+        if (orderId == null) return null;
         SQLiteDatabase db = getReadableDatabase();
         Cursor c = db.rawQuery("SELECT * FROM " + T_ORDERS +
                 " WHERE " + O_ID + "=?", new String[]{orderId});
@@ -471,6 +514,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     }
 
     public void updateOrderStatus(String orderId, String status) {
+        if (orderId == null) return;
         SQLiteDatabase db = getWritableDatabase();
         ContentValues cv = new ContentValues();
         cv.put(O_STATUS, status);
@@ -479,7 +523,35 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         db.close();
     }
 
+    public void finalizePayment(String orderId, double actualPaidAmount) {
+        if (orderId == null) return;
+        SQLiteDatabase db = getWritableDatabase();
+        ContentValues cv = new ContentValues();
+        cv.put(O_STATUS, "PAID");
+        cv.put(O_TOTAL,  actualPaidAmount);  // lưu số tiền thực thu
+        cv.put(O_PAID,   System.currentTimeMillis());
+        db.update(T_ORDERS, cv, O_ID + "=?", new String[]{orderId});
+        db.close();
+    }
+
+    public void finalizePaymentMultiple(List<String> orderIds, double totalActualPaid) {
+        if (orderIds == null || orderIds.isEmpty()) return;
+        SQLiteDatabase db = getWritableDatabase();
+        long now = System.currentTimeMillis();
+        // Chia đều tổng cho các đơn (hoặc gán hết cho đơn đầu nếu muốn)
+        double perOrder = totalActualPaid / orderIds.size();
+        for (String oid : orderIds) {
+            ContentValues cv = new ContentValues();
+            cv.put(O_STATUS, "PAID");
+            cv.put(O_TOTAL,  perOrder);
+            cv.put(O_PAID,   now);
+            db.update(T_ORDERS, cv, O_ID + "=?", new String[]{oid});
+        }
+        db.close();
+    }
+
     public void recalcOrderTotal(String orderId) {
+        if (orderId == null) return;
         SQLiteDatabase db = getWritableDatabase();
         Cursor c = db.rawQuery("SELECT SUM(" + D_QTY + "*" + D_PRICE + ") FROM " + T_DETAILS +
                 " WHERE " + D_ORDER + "=? AND " + D_STATUS + " != 'CANCELLED'",
@@ -529,13 +601,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         String did = UUID.randomUUID().toString();
         SQLiteDatabase db = getWritableDatabase();
         ContentValues cv = new ContentValues();
-        cv.put(D_ID,    did);     cv.put(D_ORDER,  orderId);
-        cv.put(D_ITEM,  itemId);  cv.put(D_INAME,  itemName);
-        cv.put(D_IMGURL,imgUrl);  cv.put(D_QTY,    qty);
-        cv.put(D_PRICE, price);   cv.put(D_NOTE,   note);
-        cv.put(D_TABLE, tableId); cv.put(D_TNAME,  tableName);
-        cv.put(D_STATUS,status);  cv.put(D_TIME,   System.currentTimeMillis());
-        cv.put(D_FINISH,0L);
+        cv.put(D_ID,     did);     cv.put(D_ORDER,  orderId);
+        cv.put(D_ITEM,   itemId);  cv.put(D_INAME,  itemName);
+        cv.put(D_IMGURL, imgUrl);  cv.put(D_QTY,    qty);
+        cv.put(D_PRICE,  price);   cv.put(D_NOTE,   note);
+        cv.put(D_TABLE,  tableId); cv.put(D_TNAME,  tableName);
+        cv.put(D_STATUS, status);  cv.put(D_TIME,   System.currentTimeMillis());
+        cv.put(D_FINISH, 0L);
         db.insert(T_DETAILS, null, cv);
         db.close();
         return did;
@@ -551,30 +623,54 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         db.close();
     }
 
+    public void rollbackDetailToCoking(String detailId) {
+        SQLiteDatabase db = getWritableDatabase();
+        ContentValues cv = new ContentValues();
+        cv.put(D_STATUS, "COOKING");
+        cv.put(D_FINISH, 0L);
+        // Chỉ rollback nếu đang ở DELIVERING
+        db.update(T_DETAILS, cv,
+                D_ID + "=? AND " + D_STATUS + "='DELIVERING'",
+                new String[]{detailId});
+        db.close();
+    }
+
     public void confirmOrderTable(String orderId, String tableId, String tableName) {
         SQLiteDatabase db = getWritableDatabase();
+
+        // Cập nhật item PENDING_CONFIRM → COOKING
         ContentValues cv = new ContentValues();
         cv.put(D_TABLE,  tableId);
         cv.put(D_TNAME,  tableName);
         cv.put(D_STATUS, "COOKING");
-        db.update(T_DETAILS, cv, D_ORDER + "=? AND " + D_STATUS + "='PENDING_CONFIRM'",
+        db.update(T_DETAILS, cv,
+                D_ORDER + "=? AND " + D_STATUS + "='PENDING_CONFIRM'",
                 new String[]{orderId});
-        // Cập nhật order-level tableName
+
         ContentValues ocv = new ContentValues();
-        ocv.put(O_TABLE, tableId); ocv.put(O_TNAME, tableName);
+        ocv.put(O_TABLE, tableId);
+        ocv.put(O_TNAME, tableName);
         db.update(T_ORDERS, ocv, O_ID + "=?", new String[]{orderId});
+
         // Bàn → OCCUPIED
         ContentValues tcv = new ContentValues();
-        tcv.put(TB_STATUS, "OCCUPIED"); tcv.put(TB_ORD, orderId);
+        tcv.put(TB_STATUS, "OCCUPIED");
+        tcv.put(TB_ORD, orderId);
         db.update(T_TABLES, tcv, TB_ID + "=?", new String[]{tableId});
+
         db.close();
     }
+
     public ArrayList<OrderDetail> getDetailsByStatus(String status) {
         ArrayList<OrderDetail> list = new ArrayList<>();
         SQLiteDatabase db = getReadableDatabase();
-        Cursor c = db.rawQuery("SELECT d.*, o." + O_TNAME + " AS _tname FROM " +
-                T_DETAILS + " d LEFT JOIN " + T_ORDERS + " o ON d." + D_ORDER + "=o." + O_ID +
-                " WHERE d." + D_STATUS + "=? ORDER BY d." + D_TIME,
+        // INNER JOIN → loại đơn đã PAID/CANCELLED
+        Cursor c = db.rawQuery(
+                "SELECT d.*, o." + O_TNAME + " AS _tname FROM " +
+                T_DETAILS + " d INNER JOIN " + T_ORDERS + " o ON d." + D_ORDER + "=o." + O_ID +
+                " WHERE d." + D_STATUS + "=?" +
+                "   AND o." + O_STATUS + " NOT IN ('PAID','CANCELLED')" +
+                " ORDER BY d." + D_TIME,
                 new String[]{status});
         while (c.moveToNext()) list.add(cursorToDetail(c));
         c.close(); db.close();
@@ -602,7 +698,6 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         d.setUnitPrice(c.getDouble(c.getColumnIndexOrThrow(D_PRICE)));
         d.setNote(c.getString(c.getColumnIndexOrThrow(D_NOTE)));
         d.setTableId(c.getString(c.getColumnIndexOrThrow(D_TABLE)));
-        // tableName có thể từ join hoặc column D_TNAME
         int tnIdx = c.getColumnIndex("_tname");
         if (tnIdx >= 0 && !c.isNull(tnIdx))
             d.setTableName(c.getString(tnIdx));
@@ -613,42 +708,16 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         return d;
     }
 
-    public void saveSchedule(int userId, String dateKey, boolean morning, boolean afternoon, boolean evening) {
-        SQLiteDatabase db = getWritableDatabase();
-        ContentValues cv = new ContentValues();
-        cv.put(S_UID,   userId);  cv.put(S_DATE,  dateKey);
-        cv.put(S_MORN,  morning  ? 1 : 0);
-        cv.put(S_AFTER, afternoon? 1 : 0);
-        cv.put(S_EVE,   evening  ? 1 : 0);
-        cv.put(S_STATUS,"REGISTERED");
-        db.insertWithOnConflict(T_SCHED, null, cv, SQLiteDatabase.CONFLICT_REPLACE);
-        db.close();
-    }
-
-    public void markAttendance(int userId, String dateKey) {
-        SQLiteDatabase db = getWritableDatabase();
-        ContentValues cv = new ContentValues();
-        cv.put(S_STATUS, "ATTENDED");
-        db.update(T_SCHED, cv, S_UID + "=? AND " + S_DATE + "=?",
-                new String[]{String.valueOf(userId), dateKey});
-        db.close();
-    }
-
-    public Cursor getScheduleForUser(int userId) {
+    public double getActiveMemberDiscountPercent() {
         SQLiteDatabase db = getReadableDatabase();
-        return db.rawQuery("SELECT * FROM " + T_SCHED + " WHERE " + S_UID + "=?" +
-                " ORDER BY " + S_DATE, new String[]{String.valueOf(userId)});
-    }
-
-    public int countAttendedDays(int userId) {
-        SQLiteDatabase db = getReadableDatabase();
-        Cursor c = db.rawQuery("SELECT COUNT(*) FROM " + T_SCHED +
-                " WHERE " + S_UID + "=? AND " + S_STATUS + "='ATTENDED'",
-                new String[]{String.valueOf(userId)});
-        int count = 0;
-        if (c.moveToFirst()) count = c.getInt(0);
+        Cursor c = db.rawQuery(
+                "SELECT " + P_DISC + " FROM " + T_PROMO +
+                " WHERE " + P_TARGET + "='MEMBER' AND " + P_ACTIVE + "=1" +
+                " ORDER BY " + P_ID + " DESC LIMIT 1", null);
+        double disc = 0.0;
+        if (c.moveToFirst()) disc = c.getDouble(0);
         c.close(); db.close();
-        return count;
+        return disc;
     }
 
     public Cursor getPromotions() {
@@ -671,5 +740,65 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         cv.put(P_ACTIVE, active ? 1 : 0);
         db.update(T_PROMO, cv, P_ID + "=?", new String[]{String.valueOf(promoId)});
         db.close();
+    }
+
+    public boolean saveSchedule(int userId, String dateKey,
+                                 boolean morning, boolean afternoon, boolean evening) {
+        // dateKey định dạng "yyyy-MM-dd"
+        String today = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                .format(new java.util.Date());
+        if (dateKey.compareTo(today) < 0) return false; // quá khứ, từ chối
+
+        SQLiteDatabase db = getWritableDatabase();
+        ContentValues cv = new ContentValues();
+        cv.put(S_UID,   userId);  cv.put(S_DATE,  dateKey);
+        cv.put(S_MORN,  morning   ? 1 : 0);
+        cv.put(S_AFTER, afternoon ? 1 : 0);
+        cv.put(S_EVE,   evening   ? 1 : 0);
+        cv.put(S_STATUS, "REGISTERED");
+        db.insertWithOnConflict(T_SCHED, null, cv, SQLiteDatabase.CONFLICT_REPLACE);
+        db.close();
+        return true;
+    }
+
+    public void markAttendance(int userId, String dateKey) {
+        SQLiteDatabase db = getWritableDatabase();
+        ContentValues cv = new ContentValues();
+        cv.put(S_STATUS, "ATTENDED");
+        db.update(T_SCHED, cv, S_UID + "=? AND " + S_DATE + "=?",
+                new String[]{String.valueOf(userId), dateKey});
+        db.close();
+    }
+
+    public boolean markAttendanceShifts(int userId, String dateKey,
+                                         boolean morning, boolean afternoon, boolean evening) {
+        SQLiteDatabase db = getWritableDatabase();
+        ContentValues cv  = new ContentValues();
+        cv.put(S_MORN,   morning   ? 1 : 0);
+        cv.put(S_AFTER,  afternoon ? 1 : 0);
+        cv.put(S_EVE,    evening   ? 1 : 0);
+        cv.put(S_STATUS, "ATTENDED");
+        int rows = db.update(T_SCHED, cv,
+                S_UID + "=? AND " + S_DATE + "=?",
+                new String[]{String.valueOf(userId), dateKey});
+        db.close();
+        return rows > 0;
+    }
+
+    public Cursor getScheduleForUser(int userId) {
+        SQLiteDatabase db = getReadableDatabase();
+        return db.rawQuery("SELECT * FROM " + T_SCHED + " WHERE " + S_UID + "=?" +
+                " ORDER BY " + S_DATE, new String[]{String.valueOf(userId)});
+    }
+
+    public int countAttendedDays(int userId) {
+        SQLiteDatabase db = getReadableDatabase();
+        Cursor c = db.rawQuery("SELECT COUNT(*) FROM " + T_SCHED +
+                " WHERE " + S_UID + "=? AND " + S_STATUS + "='ATTENDED'",
+                new String[]{String.valueOf(userId)});
+        int count = 0;
+        if (c.moveToFirst()) count = c.getInt(0);
+        c.close(); db.close();
+        return count;
     }
 }

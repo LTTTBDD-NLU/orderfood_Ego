@@ -17,6 +17,8 @@ import com.ego.restaurant.R;
 import com.ego.restaurant.helpers.DatabaseHelper;
 import com.ego.restaurant.models.MenuItem;
 import com.ego.restaurant.models.Order;
+import com.ego.restaurant.models.OrderDetail;
+import com.ego.restaurant.utils.SessionManager;
 
 import java.text.NumberFormat;
 import java.util.ArrayList;
@@ -28,17 +30,16 @@ public class WaitingConfirmActivity extends AppCompatActivity {
     private ProgressBar progressWaiting;
     private Button      btnCancelOrder, btnViewTracking;
 
-    private String             orderId, tableId, tableName;
+    private String              orderId, tableId, tableName;
     private ArrayList<MenuItem> cartItems = new ArrayList<>();
+    private boolean             confirmed = false;
 
-    private final Handler  handler   = new Handler(Looper.getMainLooper());
-    private boolean        confirmed = false;
-
+    private final Handler  handler  = new Handler(Looper.getMainLooper());
     private final Runnable pollTask = new Runnable() {
         @Override public void run() {
             if (confirmed) return;
             checkConfirmationStatus();
-            handler.postDelayed(this, 2000); // poll mỗi 2 giây
+            handler.postDelayed(this, 2000);
         }
     };
 
@@ -68,70 +69,90 @@ public class WaitingConfirmActivity extends AppCompatActivity {
         buildOrderSummary();
 
         btnViewTracking.setOnClickListener(v -> goToTracking());
-        btnCancelOrder.setOnClickListener(v -> confirmCancel());
+        btnCancelOrder.setOnClickListener(v  -> confirmCancel());
 
-        // Bắt đầu polling
+        if (orderId != null) {
+            Order o = DatabaseHelper.getInstance(this).getOrderById(orderId);
+            if (o != null && "CANCELLED".equals(o.getOrderStatus())) {
+                Toast.makeText(this, "Đơn hàng đã bị hủy", Toast.LENGTH_LONG).show();
+                finish();
+                return;
+            }
+        }
+
         handler.post(pollTask);
     }
 
     private void buildOrderSummary() {
-        if (cartItems.isEmpty()) {
-            // Load từ DB nếu cartItems không được truyền qua
-            if (orderId != null) {
-                Order o = DatabaseHelper.getInstance(this).getOrderById(orderId);
-                if (o != null && o.getItems() != null) {
-                    StringBuilder sb  = new StringBuilder();
-                    NumberFormat  nf  = NumberFormat.getNumberInstance(Locale.forLanguageTag("vi"));
-                    double        tot = 0;
-                    for (com.ego.restaurant.models.OrderDetail d : o.getItems()) {
-                        if ("CANCELLED".equals(d.getStatus())) continue;
-                        sb.append("• ").append(d.getItemName())
-                          .append("  x").append(d.getQuantity()).append("\n");
-                        tot += d.getUnitPrice() * d.getQuantity();
-                    }
-                    tvOrderSummary.setText(sb.toString().trim());
-                    tvOrderTotal.setText(nf.format((long) tot) + " đ");
-                }
+        // Ưu tiên dùng cartItems từ intent (nhanh hơn)
+        if (!cartItems.isEmpty()) {
+            StringBuilder sb  = new StringBuilder();
+            double        tot = 0;
+            for (MenuItem item : cartItems) {
+                sb.append("• ").append(item.getItemName())
+                  .append("  x").append(item.getQuantity()).append("\n");
+                tot += item.getAppliedPrice("GUEST") * item.getQuantity();
             }
+            tvOrderSummary.setText(sb.toString().trim());
+            NumberFormat nf = NumberFormat.getNumberInstance(Locale.forLanguageTag("vi"));
+            tvOrderTotal.setText(nf.format((long) tot) + " đ");
             return;
         }
-        StringBuilder sb  = new StringBuilder();
-        double        tot = 0;
-        for (MenuItem item : cartItems) {
-            sb.append("• ").append(item.getItemName())
-              .append("  x").append(item.getQuantity()).append("\n");
-            tot += item.getAppliedPrice("GUEST") * item.getQuantity();
+        // Fallback: load từ DB (khi resume sau khi app bị kill)
+        if (orderId != null) {
+            Order o = DatabaseHelper.getInstance(this).getOrderById(orderId);
+            if (o != null && o.getItems() != null) {
+                StringBuilder sb  = new StringBuilder();
+                double        tot = 0;
+                NumberFormat  nf  = NumberFormat.getNumberInstance(Locale.forLanguageTag("vi"));
+                for (OrderDetail d : o.getItems()) {
+                    if ("CANCELLED".equals(d.getStatus())) continue;
+                    sb.append("• ").append(d.getItemName())
+                      .append("  x").append(d.getQuantity()).append("\n");
+                    tot += d.getUnitPrice() * d.getQuantity();
+                }
+                tvOrderSummary.setText(sb.toString().trim());
+                tvOrderTotal.setText(nf.format((long) tot) + " đ");
+            }
         }
-        tvOrderSummary.setText(sb.toString().trim());
-        NumberFormat nf = NumberFormat.getNumberInstance(Locale.forLanguageTag("vi"));
-        tvOrderTotal.setText(nf.format((long) tot) + " đ");
     }
 
-    /** Kiểm tra DB: nếu không còn item PENDING_CONFIRM → đã xác nhận */
     private void checkConfirmationStatus() {
         if (orderId == null) return;
         Order o = DatabaseHelper.getInstance(this).getOrderById(orderId);
         if (o == null || o.getItems() == null) return;
 
+        if ("CANCELLED".equals(o.getOrderStatus())) {
+            confirmed = true;
+            handler.removeCallbacks(pollTask);
+            tvStatusUpdate.setText("❌ Đơn hàng đã bị huỷ.");
+            progressWaiting.setVisibility(View.GONE);
+            handler.postDelayed(() -> {
+                new SessionManager(this).clearActiveOrder();
+                finish();
+            }, 1500);
+            return;
+        }
+
         boolean hasPending = false;
         boolean hasActive  = false;
-        for (com.ego.restaurant.models.OrderDetail d : o.getItems()) {
+        for (OrderDetail d : o.getItems()) {
             if ("CANCELLED".equals(d.getStatus())) continue;
             hasActive = true;
             if ("PENDING_CONFIRM".equals(d.getStatus())) { hasPending = true; break; }
         }
 
-        if (!hasActive) return; // đơn chưa có items active
+        if (!hasActive) return;
 
         if (!hasPending) {
-            // Tất cả đã được xác nhận!
+            // Waiter đã xác nhận tất cả items → sang OTA
             confirmed = true;
             handler.removeCallbacks(pollTask);
-            tvStatusUpdate.setText("✅ Đã được xác nhận! Đang chuyển...");
+            tvStatusUpdate.setText("✅ Bàn đã được xác nhận! Đang chuyển...");
             progressWaiting.setVisibility(View.GONE);
             handler.postDelayed(this::goToTracking, 1000);
         } else {
-            tvStatusUpdate.setText("Đang chờ nhân viên xác nhận...");
+            tvStatusUpdate.setText("⏳ Đang chờ nhân viên xác nhận bàn...");
         }
     }
 
@@ -153,6 +174,7 @@ public class WaitingConfirmActivity extends AppCompatActivity {
                 .setPositiveButton("Hủy đơn", (d, w) -> {
                     if (orderId != null)
                         DatabaseHelper.getInstance(this).updateOrderStatus(orderId, "CANCELLED");
+                    new SessionManager(this).clearActiveOrder();
                     Toast.makeText(this, "Đã hủy đơn", Toast.LENGTH_SHORT).show();
                     finish();
                 })
@@ -160,9 +182,11 @@ public class WaitingConfirmActivity extends AppCompatActivity {
                 .show();
     }
 
-    @Override public void onBackPressed() { confirmCancel(); }
+    @Override
+    public void onBackPressed() { confirmCancel(); }
 
-    @Override protected void onDestroy() {
+    @Override
+    protected void onDestroy() {
         super.onDestroy();
         handler.removeCallbacks(pollTask);
     }

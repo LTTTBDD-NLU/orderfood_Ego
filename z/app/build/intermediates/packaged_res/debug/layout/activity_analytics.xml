@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Màn hình 25: Báo cáo & Phân quyền -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background_light">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="@color/colorPrimary"
+        android:padding="16dp"
+        android:gravity="center_vertical">
+
+        <TextView android:id="@+id/tv_back"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="←" android:textColor="@color/white"
+            android:textSize="20sp" android:layout_marginEnd="12dp"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Báo cáo doanh thu"
+            android:textColor="@color/white"
+            android:textSize="18sp"
+            android:textStyle="bold"/>
+    </LinearLayout>
+
+    <!-- Bộ lọc theo thời gian -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="@color/white"
+        android:padding="8dp">
+
+        <Button android:id="@+id/btn_filter_day"
+            android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:text="Ngày"
+            android:backgroundTint="@color/colorPrimary" android:textColor="@color/white"
+            android:textSize="13sp" android:layout_marginEnd="4dp"/>
+        <Button android:id="@+id/btn_filter_week"
+            android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:text="Tuần"
+            android:backgroundTint="@color/background_light" android:textColor="#212121"
+            android:textSize="13sp" android:layout_marginEnd="4dp"/>
+        <Button android:id="@+id/btn_filter_month"
+            android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:text="Tháng"
+            android:backgroundTint="@color/background_light" android:textColor="#212121"
+            android:textSize="13sp"/>
+    </LinearLayout>
+
+    <ScrollView android:layout_width="match_parent" android:layout_height="match_parent">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="vertical" android:padding="12dp">
+
+            <!-- Thẻ tổng doanh thu -->
+            <LinearLayout
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:background="@color/colorPrimary"
+                android:padding="20dp" android:elevation="6dp"
+                android:gravity="center" android:layout_marginBottom="12dp">
+
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="Tổng doanh thu" android:textColor="@color/white"
+                    android:textSize="13sp" android:alpha="0.85"/>
+                <TextView android:id="@+id/tv_total_revenue"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="0 đ" android:textColor="@color/white"
+                    android:textSize="32sp" android:textStyle="bold"/>
+                <TextView android:id="@+id/tv_revenue_period"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="Hôm nay" android:textColor="@color/white"
+                    android:textSize="12sp" android:alpha="0.75"/>
+            </LinearLayout>
+
+            <!-- Thống kê phụ -->
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="horizontal" android:layout_marginBottom="12dp">
+
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_weight="1" android:orientation="vertical"
+                    android:background="@color/white" android:padding="14dp"
+                    android:elevation="4dp" android:gravity="center" android:layout_marginEnd="6dp">
+                    <TextView android:id="@+id/tv_order_count"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="0" android:textSize="22sp" android:textStyle="bold"
+                        android:textColor="#2196F3"/>
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Số đơn" android:textSize="12sp"
+                        android:textColor="@color/text_secondary"/>
+                </LinearLayout>
+
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_weight="1" android:orientation="vertical"
+                    android:background="@color/white" android:padding="14dp"
+                    android:elevation="4dp" android:gravity="center">
+                    <TextView android:id="@+id/tv_avg_order"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="0đ" android:textSize="18sp" android:textStyle="bold"
+                        android:textColor="@color/colorAccent"/>
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="TB mỗi đơn" android:textSize="12sp"
+                        android:textColor="@color/text_secondary" android:gravity="center"/>
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Top món bán chạy -->
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Top món bán chạy" android:textSize="15sp"
+                android:textStyle="bold" android:textColor="#212121"
+                android:layout_marginBottom="8dp"/>
+
+            <ListView android:id="@+id/lv_top_items"
+                android:layout_width="match_parent" android:layout_height="300dp"
+                android:divider="@android:color/transparent" android:dividerHeight="4dp"/>
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

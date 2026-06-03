@@ -4,6 +4,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -24,15 +25,16 @@ import java.util.Locale;
 
 public class AdminDashboardActivity extends AppCompatActivity {
 
+    // IDs tồn tại trong activity_admin_dashboard.xml
     private TextView     tvMyName, tvTodayRevenue, tvTodayOrders;
     private LinearLayout navFloorMap, navStaff, navMenu, navAnalytics,
                          navSchedule, navPromotions, navProfile;
 
+    private TextView tvScheduleSubLabel;
     private SessionManager sm;
     private final Handler  handler  = new Handler(Looper.getMainLooper());
     private final Runnable pollTask = new Runnable() {
-        @Override
-        public void run() {
+        @Override public void run() {
             refreshStats();
             handler.postDelayed(this, 5000);
         }
@@ -61,6 +63,11 @@ public class AdminDashboardActivity extends AppCompatActivity {
         navSchedule    = findViewById(R.id.nav_schedule);
         navPromotions  = findViewById(R.id.nav_promotions);
         navProfile     = findViewById(R.id.nav_profile);
+
+        if (navSchedule != null && navSchedule.getChildCount() >= 3) {
+            View child = navSchedule.getChildAt(2);
+            if (child instanceof TextView) tvScheduleSubLabel = (TextView) child;
+        }
 
         tvMyName.setText(sm.getFullName());
         setupNavigation(role);
@@ -93,8 +100,24 @@ public class AdminDashboardActivity extends AppCompatActivity {
             else Toast.makeText(this, getString(R.string.error_no_permission), Toast.LENGTH_SHORT).show();
         });
 
-        navSchedule.setOnClickListener(v ->
-                startActivity(new Intent(this, ScheduleActivity.class)));
+        navSchedule.setOnClickListener(v -> {
+            int pending = DatabaseHelper.getInstance(this).getDetailsByStatus("PENDING_CONFIRM").size();
+            if (pending > 0 && PermissionHelper.hasPermission(role, PermissionHelper.VERIFY_GUEST_ORDER)) {
+                new AlertDialog.Builder(this)
+                    .setTitle("Chọn chức năng")
+                    .setItems(new String[]{
+                            "📅  Lịch làm việc / Chấm công",
+                            "⏳  Duyệt " + pending + " đơn chờ xác nhận"
+                    }, (d, which) -> {
+                        if (which == 0) startActivity(new Intent(this, ScheduleActivity.class));
+                        else            startActivity(new Intent(this, WaiterActivity.class));
+                    })
+                    .setNegativeButton("Đóng", null)
+                    .show();
+            } else {
+                startActivity(new Intent(this, ScheduleActivity.class));
+            }
+        });
 
         navPromotions.setOnClickListener(v -> {
             if (PermissionHelper.hasPermission(role, PermissionHelper.MANAGE_MENU_CATALOG))
@@ -114,21 +137,30 @@ public class AdminDashboardActivity extends AppCompatActivity {
 
     private void refreshStats() {
         Calendar cal = Calendar.getInstance();
-        cal.set(Calendar.HOUR_OF_DAY, 0);
-        cal.set(Calendar.MINUTE, 0);
-        cal.set(Calendar.SECOND, 0);
-        cal.set(Calendar.MILLISECOND, 0);
+        cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0);
+        cal.set(Calendar.SECOND, 0);      cal.set(Calendar.MILLISECOND, 0);
         long todayStart = cal.getTimeInMillis();
-        long now = System.currentTimeMillis();
+        long now        = System.currentTimeMillis();
 
-        ArrayList<Order> paidOrders = DatabaseHelper.getInstance(this)
-                .getPaidOrders(todayStart, now);
+        DatabaseHelper db = DatabaseHelper.getInstance(this);
+        ArrayList<Order> paidOrders = db.getPaidOrders(todayStart, now);
         double total = 0;
         for (Order o : paidOrders) total += o.getTotalAmount();
 
         NumberFormat nf = NumberFormat.getNumberInstance(Locale.forLanguageTag("vi"));
         tvTodayRevenue.setText(nf.format((long) total) + " đ");
         tvTodayOrders.setText(String.valueOf(paidOrders.size()));
+
+        int pendingCount = db.getDetailsByStatus("PENDING_CONFIRM").size();
+        if (tvScheduleSubLabel != null) {
+            if (pendingCount > 0) {
+                tvScheduleSubLabel.setText("⚠ " + pendingCount + " đơn chờ duyệt");
+                tvScheduleSubLabel.setTextColor(0xFFE64A19);
+            } else {
+                tvScheduleSubLabel.setText("Chấm công nhân viên");
+                tvScheduleSubLabel.setTextColor(0xFF9E9E9E);
+            }
+        }
     }
 
     @Override protected void onDestroy() {

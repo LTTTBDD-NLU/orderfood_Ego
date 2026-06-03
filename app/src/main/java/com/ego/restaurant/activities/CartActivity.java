@@ -48,6 +48,7 @@ public class CartActivity extends AppCompatActivity {
         tableName       = getIntent().getStringExtra("table_name");
         tableId         = getIntent().getStringExtra("table_id");
         existingOrderId = getIntent().getStringExtra("existing_order_id");
+
         if (role == null)      role      = sm.getRole();
         if (tableName == null) tableName = tableNumber > 0 ? "Bàn " + tableNumber : "--";
 
@@ -64,6 +65,7 @@ public class CartActivity extends AppCompatActivity {
         layoutGuestTable  = findViewById(R.id.layout_guest_table);
         layoutSavings     = findViewById(R.id.layout_savings);
 
+        // Hiển thị ô nhập bàn chỉ khi GUEST đặt lần đầu
         if ("GUEST".equals(role)) {
             layoutGuestTable.setVisibility(existingOrderId == null ? View.VISIBLE : View.GONE);
             if (tableNumber > 0) etGuestTable.setText(String.valueOf(tableNumber));
@@ -82,6 +84,7 @@ public class CartActivity extends AppCompatActivity {
                 ? "Thêm món cho: " + tableName
                 : "Đặt cho: " + tableName);
         updateTotal();
+
         findViewById(R.id.tv_back_menu).setOnClickListener(v -> finish());
         btnConfirmOrder.setOnClickListener(v -> confirmOrder());
     }
@@ -106,13 +109,13 @@ public class CartActivity extends AppCompatActivity {
             return;
         }
 
-        // Guest lần đầu: bắt nhập số bàn
+        // GUEST lần đầu đặt: yêu cầu nhập số bàn
         if ("GUEST".equals(role) && existingOrderId == null) {
             String tStr = etGuestTable.getText().toString().trim();
             if (TextUtils.isEmpty(tStr)) { etGuestTable.setError("Nhập số bàn"); return; }
             try {
                 tableNumber = Integer.parseInt(tStr);
-                tableName   = "Bàn " + tableNumber;
+                tableName   = "Bàn " + String.format("%02d", tableNumber);
             } catch (NumberFormatException e) { etGuestTable.setError("Không hợp lệ"); return; }
         }
 
@@ -123,9 +126,27 @@ public class CartActivity extends AppCompatActivity {
                 ? tableId : String.format("T%02d", tableNumber);
 
         DatabaseHelper db    = DatabaseHelper.getInstance(this);
-        String         userId= sm.getUid();
-        // status item: MEMBER → COOKING (thẳng bếp), GUEST → PENDING_CONFIRM
-        String itemStatus = "MEMBER".equals(role) ? "COOKING" : "PENDING_CONFIRM";
+        String         userId = sm.getUid();
+
+        /*
+         * ══════════════════════════════════════════════════════════════════
+         * Bug #18 + NEW BUG FIX: logic itemStatus
+         *
+         * CŨ (sai): "MEMBER".equals(role) ? "COOKING" : "PENDING_CONFIRM"
+         *   → WAITSTAFF/ADMIN gọi món hộ bị PENDING_CONFIRM → bếp không thấy
+         *
+         * MỚI (đúng):
+         *   - GUEST lần đầu đặt (chưa có bàn)     → PENDING_CONFIRM (waiter xác nhận)
+         *   - GUEST gọi thêm món (đơn đã có)       → COOKING trực tiếp
+         *   - MEMBER / WAITSTAFF / ADMIN / bất kỳ  → COOKING trực tiếp
+         * ══════════════════════════════════════════════════════════════════
+         */
+        String itemStatus;
+        if ("GUEST".equals(role) && existingOrderId == null) {
+            itemStatus = "PENDING_CONFIRM"; // lần đầu, waiter chưa biết bàn thật
+        } else {
+            itemStatus = "COOKING"; // mọi trường hợp còn lại → thẳng bếp
+        }
 
         String orderId;
         if (existingOrderId != null) {
@@ -150,12 +171,21 @@ public class CartActivity extends AppCompatActivity {
         }
         db.recalcOrderTotal(orderId);
 
-        Toast.makeText(this,
-                "MEMBER".equals(role) ? "✅ Đặt thành công! Bếp đang chế biến."
-                                      : "⏳ Đã gửi! Nhân viên sẽ xác nhận bàn.",
-                Toast.LENGTH_LONG).show();
+        // Bug #42 FIX: lưu orderId vào SessionManager để resume sau khi tắt app
+        sm.saveActiveOrder(finalOrderId, fTableId, tableName);
+
+        String toastMsg;
+        if ("GUEST".equals(role) && existingOrderId == null) {
+            toastMsg = "⏳ Đã gửi! Nhân viên sẽ xác nhận bàn.";
+        } else if ("MEMBER".equals(role)) {
+            toastMsg = "✅ Đặt thành công! Bếp đang chế biến.";
+        } else {
+            toastMsg = "✅ Đã gửi bếp thành công!";
+        }
+        Toast.makeText(this, toastMsg, Toast.LENGTH_LONG).show();
 
         if ("GUEST".equals(role) && existingOrderId == null) {
+            // Lần đầu GUEST → chờ waiter xác nhận
             Intent intent = new Intent(this, WaitingConfirmActivity.class);
             intent.putExtra("order_id",   finalOrderId);
             intent.putExtra("table_id",   fTableId);
@@ -164,6 +194,7 @@ public class CartActivity extends AppCompatActivity {
             intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
             startActivity(intent);
         } else {
+            // MEMBER / WAITSTAFF / GUEST gọi thêm → vào OTA trực tiếp
             Intent intent = new Intent(this, OrderTrackingActivity.class);
             intent.putExtra("order_id",   finalOrderId);
             intent.putExtra("table_id",   fTableId);

@@ -1,7 +1,7 @@
 package com.ego.restaurant.adapters;
 
 import android.content.Context;
-import android.graphics.Color;
+import android.graphics.Typeface;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -13,142 +13,136 @@ import android.widget.Toast;
 
 import com.ego.restaurant.R;
 import com.ego.restaurant.activities.ScheduleActivity.ScheduleDayItem;
-import com.ego.restaurant.helpers.DatabaseHelper;
 
-import java.text.SimpleDateFormat;
 import java.util.List;
-import java.util.Locale;
+
 
 public class ScheduleDayAdapter extends BaseAdapter {
 
-    public interface OnSaveListener {
-        void onSave(ScheduleDayItem item);
-    }
+    public interface OnShiftChangedListener  { void onChanged(ScheduleDayItem item); }
+    public interface OnAttendanceListener    { void onAttend(ScheduleDayItem item); }
 
-    private final Context ctx;
+    private final Context               ctx;
     private final List<ScheduleDayItem> items;
-    private final String role;
-    private int targetUserId;
-    private final boolean isManager;
-    private final OnSaveListener saveListener;
+    private final boolean               isManager;
+    private final OnShiftChangedListener shiftListener;
+    private final OnAttendanceListener   attendListener;
 
-    public ScheduleDayAdapter(Context c, List<ScheduleDayItem> items,
-                              String role, String targetUid,
-                              boolean isManager, OnSaveListener sl) {
-        this.ctx = c;
-        this.items = items;
-        this.role = role;
-        this.isManager = isManager;
-        this.saveListener = sl;
-        try {
-            this.targetUserId = Integer.parseInt(targetUid);
-        } catch (Exception e) {
-            this.targetUserId = -1;
-        }
+    public ScheduleDayAdapter(Context ctx, List<ScheduleDayItem> items,
+                               boolean isManager,
+                               OnShiftChangedListener shiftListener,
+                               OnAttendanceListener   attendListener) {
+        this.ctx            = ctx;
+        this.items          = items;
+        this.isManager      = isManager;
+        this.shiftListener  = shiftListener;
+        this.attendListener = attendListener;
     }
 
-    public void setTargetUid(String uid) {
-        try {
-            this.targetUserId = Integer.parseInt(uid);
-        } catch (Exception e) {
-            this.targetUserId = -1;
-        }
-    }
-
-    @Override
-    public int getCount() {
-        return items.size();
-    }
-
-    @Override
-    public Object getItem(int pos) {
-        return items.get(pos);
-    }
-
-    @Override
-    public long getItemId(int pos) {
-        return pos;
-    }
+    @Override public int    getCount()         { return items.size(); }
+    @Override public Object getItem(int pos)   { return items.get(pos); }
+    @Override public long   getItemId(int pos) { return pos; }
 
     @Override
     public View getView(int position, View convertView, ViewGroup parent) {
-        if (convertView == null)
-            convertView = LayoutInflater.from(ctx)
+        ViewHolder h;
+        if (convertView == null) {
+            convertView     = LayoutInflater.from(ctx)
                     .inflate(R.layout.item_schedule_day, parent, false);
+            h               = new ViewHolder();
+            h.tvLabel       = convertView.findViewById(R.id.tv_day_label);
+            h.cbMorning     = convertView.findViewById(R.id.cb_morning);
+            h.cbAfternoon   = convertView.findViewById(R.id.cb_afternoon);
+            h.cbEvening     = convertView.findViewById(R.id.cb_evening);
+            h.btnAttendance = convertView.findViewById(R.id.btn_attendance);
+            convertView.setTag(h);
+        } else {
+            h = (ViewHolder) convertView.getTag();
+        }
 
-        ScheduleDayItem day = items.get(position);
-        TextView tvDay = convertView.findViewById(R.id.tv_day_label);
-        CheckBox cbMorn = convertView.findViewById(R.id.cb_morning);
-        CheckBox cbAfter = convertView.findViewById(R.id.cb_afternoon);
-        CheckBox cbEve = convertView.findViewById(R.id.cb_evening);
-        Button btnAttend = convertView.findViewById(R.id.btn_attendance);
+        ScheduleDayItem item = items.get(position);
 
-        tvDay.setText(day.label);
+        // Xóa listener cũ trước khi set state (tránh trigger khi recycle)
+        h.cbMorning.setOnCheckedChangeListener(null);
+        h.cbAfternoon.setOnCheckedChangeListener(null);
+        h.cbEvening.setOnCheckedChangeListener(null);
 
-        // Màu nền theo trạng thái chấm công
-        convertView.setBackgroundColor(
-                "ATTENDED".equals(day.status) ? 0xFFE8F5E9 : Color.WHITE);
+        // ── Label ngày ──────────────────────────────────────────────
+        h.tvLabel.setText(item.label);
+        if ("ATTENDED".equals(item.status)) {
+            h.tvLabel.setTextColor(0xFF2E7D32);
+            h.tvLabel.setTypeface(null, Typeface.BOLD);
+            h.tvLabel.setText(item.label + "  ✅");
+        } else if (item.isPast) {
+            h.tvLabel.setTextColor(0xFF9E9E9E);
+            h.tvLabel.setTypeface(null, Typeface.NORMAL);
+        } else {
+            h.tvLabel.setTextColor(0xFF212121);
+            h.tvLabel.setTypeface(null, Typeface.BOLD);
+        }
 
-        // Reset listener trước setChecked
-        cbMorn.setOnCheckedChangeListener(null);
-        cbAfter.setOnCheckedChangeListener(null);
-        cbEve.setOnCheckedChangeListener(null);
-        cbMorn.setChecked(day.morning);
-        cbAfter.setChecked(day.afternoon);
-        cbEve.setChecked(day.evening);
+        // ── Checkbox state ───────────────────────────────────────────
+        h.cbMorning.setChecked(item.morning);
+        h.cbAfternoon.setChecked(item.afternoon);
+        h.cbEvening.setChecked(item.evening);
 
-        if (isManager) {
-            // Quản lý: checkbox chỉ đọc, nút Chấm công dùng SQLite
-            cbMorn.setEnabled(false);
-            cbAfter.setEnabled(false);
-            cbEve.setEnabled(false);
-            btnAttend.setVisibility(View.VISIBLE);
+        if (item.isPast) {
+            // Ngày qua: Manager thấy checkbox để chấm, Staff chỉ xem
+            boolean editable = isManager && !"ATTENDED".equals(item.status);
+            h.cbMorning.setEnabled(editable);
+            h.cbAfternoon.setEnabled(editable);
+            h.cbEvening.setEnabled(editable);
+            convertView.setAlpha(editable ? 1f : 0.7f);
+        } else {
+            // Ngày tương lai / hôm nay: mọi người đăng ký được
+            h.cbMorning.setEnabled(true);
+            h.cbAfternoon.setEnabled(true);
+            h.cbEvening.setEnabled(true);
+            convertView.setAlpha(1f);
+        }
 
-            boolean attended = "ATTENDED".equals(day.status);
-            btnAttend.setText(attended ? "✓ Đã chấm" : "Chấm công");
-            btnAttend.setEnabled(!attended);
-            btnAttend.setBackgroundTintList(
-                    android.content.res.ColorStateList.valueOf(
-                            attended ? 0xFF9E9E9E : 0xFFE64A19));
+        // ── Listener: cập nhật model khi checkbox thay đổi ──────────
+        h.cbMorning.setOnCheckedChangeListener((btn, checked) -> {
+            item.morning = checked;
+            if (!item.isPast && shiftListener != null) shiftListener.onChanged(item);
+        });
+        h.cbAfternoon.setOnCheckedChangeListener((btn, checked) -> {
+            item.afternoon = checked;
+            if (!item.isPast && shiftListener != null) shiftListener.onChanged(item);
+        });
+        h.cbEvening.setOnCheckedChangeListener((btn, checked) -> {
+            item.evening = checked;
+            if (!item.isPast && shiftListener != null) shiftListener.onChanged(item);
+        });
 
-            btnAttend.setOnClickListener(v -> {
-                if (targetUserId < 0) {
-                    Toast.makeText(ctx, "Chọn nhân viên trước", Toast.LENGTH_SHORT).show();
+        // ── Nút Chấm công: chỉ Manager, chỉ ngày hôm nay / đã qua ──
+        if (isManager && item.isPast && !"ATTENDED".equals(item.status)) {
+            h.btnAttendance.setVisibility(View.VISIBLE);
+            h.btnAttendance.setText("Chấm\ncông");
+            h.btnAttendance.setOnClickListener(v -> {
+                if (!item.morning && !item.afternoon && !item.evening) {
+                    Toast.makeText(ctx, "Chọn ít nhất 1 ca để chấm", Toast.LENGTH_SHORT).show();
                     return;
                 }
-                String dateKey = getDateKey(day);
-                // ✅ Dùng SQLite thay Firebase
-                DatabaseHelper.getInstance(ctx).markAttendance(targetUserId, dateKey);
-                day.status = "ATTENDED";
+                if (attendListener != null) attendListener.onAttend(item);
+                item.status = "ATTENDED";
                 notifyDataSetChanged();
-                Toast.makeText(ctx, "✅ Đã chấm công: " + day.label, Toast.LENGTH_SHORT).show();
             });
-
+        } else if (isManager && "ATTENDED".equals(item.status)) {
+            h.btnAttendance.setVisibility(View.VISIBLE);
+            h.btnAttendance.setText("Đã\nchấm");
+            h.btnAttendance.setEnabled(false);
+            h.btnAttendance.setBackgroundTintList(
+                    android.content.res.ColorStateList.valueOf(0xFF4CAF50));
         } else {
-            // Nhân viên: checkbox chỉnh được, nút ẩn
-            cbMorn.setEnabled(true);
-            cbAfter.setEnabled(true);
-            cbEve.setEnabled(true);
-            btnAttend.setVisibility(View.GONE);
-
-            cbMorn.setOnCheckedChangeListener((btn, checked) -> {
-                day.morning = checked;
-                saveListener.onSave(day);
-            });
-            cbAfter.setOnCheckedChangeListener((btn, checked) -> {
-                day.afternoon = checked;
-                saveListener.onSave(day);
-            });
-            cbEve.setOnCheckedChangeListener((btn, checked) -> {
-                day.evening = checked;
-                saveListener.onSave(day);
-            });
+            h.btnAttendance.setVisibility(View.GONE);
         }
         return convertView;
     }
 
-    private String getDateKey(ScheduleDayItem day) {
-        return new SimpleDateFormat("yyyy_MM_dd", Locale.getDefault())
-                .format(day.date.getTime());
+    static class ViewHolder {
+        TextView  tvLabel;
+        CheckBox  cbMorning, cbAfternoon, cbEvening;
+        Button    btnAttendance;
     }
 }

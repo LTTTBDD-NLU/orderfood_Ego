@@ -32,16 +32,17 @@ public class OrderTrackingActivity extends AppCompatActivity {
     private Button   btnOrderMore, btnRequestPayment;
     private ListView lvOrderItems;
 
-    private String orderId, tableId, tableName, role;
+    private String  orderId, tableId, tableName, role;
     private boolean paymentRequested = false;
+    private boolean orderAlreadyPaid = false;
 
     private ArrayList<OrderDetail> orderItems = new ArrayList<>();
     private TrackingAdapter        adapter;
+    private SessionManager         sm;
 
     private final Handler  handler  = new Handler(Looper.getMainLooper());
     private final Runnable pollTask = new Runnable() {
-        @Override
-        public void run() {
+        @Override public void run() {
             refreshData();
             handler.postDelayed(this, 2000);
         }
@@ -52,11 +53,12 @@ public class OrderTrackingActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_order_tracking);
 
+        sm        = new SessionManager(this);
         orderId   = getIntent().getStringExtra("order_id");
         tableId   = getIntent().getStringExtra("table_id");
         tableName = getIntent().getStringExtra("table_name");
         role      = getIntent().getStringExtra("role");
-        if (role == null) role = new SessionManager(this).getRole();
+        if (role == null) role = sm.getRole();
 
         tvTrackingTable    = findViewById(R.id.tv_tracking_table);
         tvOrderPhaseBanner = findViewById(R.id.tv_order_phase_banner);
@@ -69,8 +71,23 @@ public class OrderTrackingActivity extends AppCompatActivity {
         adapter = new TrackingAdapter();
         lvOrderItems.setAdapter(adapter);
 
+        if (orderId == null && tableId != null) {
+            Order o = DatabaseHelper.getInstance(this).getActiveOrderByTable(tableId);
+            if (o != null) {
+                orderId = o.getOrderId();
+                sm.saveActiveOrder(orderId, tableId, tableName);
+            }
+        }
+
         btnOrderMore.setOnClickListener(v -> {
-            if (paymentRequested) { Toast.makeText(this,"Đã yêu cầu thanh toán",Toast.LENGTH_SHORT).show(); return; }
+            if (paymentRequested || orderAlreadyPaid) {
+                Toast.makeText(this, "Đơn hàng đã được gửi thanh toán", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            if (orderId == null) {
+                Toast.makeText(this, "Chưa có đơn hàng", Toast.LENGTH_SHORT).show();
+                return;
+            }
             Intent intent = new Intent(this, MenuActivity.class);
             intent.putExtra("table_id",          tableId);
             intent.putExtra("table_name",        tableName);
@@ -80,42 +97,130 @@ public class OrderTrackingActivity extends AppCompatActivity {
         });
 
         btnRequestPayment.setOnClickListener(v -> {
-            if (paymentRequested) { Toast.makeText(this,"Đã gửi rồi",Toast.LENGTH_SHORT).show(); return; }
+            if (paymentRequested || orderAlreadyPaid) {
+                Toast.makeText(this, "Đã gửi yêu cầu rồi", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            if (orderId == null) {
+                Toast.makeText(this, "Chưa có đơn hàng", Toast.LENGTH_SHORT).show();
+                return;
+            }
             showPaymentRequestDialog();
         });
 
         handler.post(pollTask);
     }
 
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        String newOrderId = intent.getStringExtra("order_id");
+        if (newOrderId != null && !newOrderId.equals(orderId)) {
+            orderId   = newOrderId;
+            tableId   = intent.getStringExtra("table_id");
+            tableName = intent.getStringExtra("table_name");
+            if (tableName != null) tvTrackingTable.setText(tableName);
+            // Reset trạng thái
+            paymentRequested = false;
+            orderAlreadyPaid = false;
+            btnRequestPayment.setText("Yêu cầu thanh toán");
+            btnRequestPayment.setEnabled(true);
+            btnOrderMore.setEnabled(true);
+        }
+        refreshData();
+    }
+
     private void refreshData() {
-        if (orderId == null) return;
+        if (orderId == null) {
+            tvOrderPhaseBanner.setText("⚠ Không tìm thấy đơn hàng");
+            tvStatusSummary.setText("Nhập số bàn và thử lại");
+            return;
+        }
+
         Order o = DatabaseHelper.getInstance(this).getOrderById(orderId);
         if (o == null) return;
+
+        if ("PAID".equals(o.getOrderStatus())) {
+            if (!orderAlreadyPaid) {
+                orderAlreadyPaid = true;
+                sm.clearActiveOrder(); // Bug #42: xóa active order khi đã trả tiền
+                runOnUiThread(() -> {
+                    tvOrderPhaseBanner.setText("✅ Đơn hàng đã thanh toán. Cảm ơn quý khách!");
+                    tvOrderPhaseBanner.setBackgroundColor(0xFF2E7D32);
+                    btnRequestPayment.setEnabled(false);
+                    btnOrderMore.setEnabled(false);
+                });
+            }
+            return;
+        }
+
+        if ("WAITING_PAYMENT".equals(o.getOrderStatus()) && !paymentRequested) {
+            paymentRequested = true;
+            runOnUiThread(() -> {
+                btnRequestPayment.setText("✅ Đã gửi yêu cầu thanh toán");
+                btnRequestPayment.setEnabled(false);
+                btnOrderMore.setEnabled(false);
+            });
+        }
+
         orderItems.clear();
-        int pending=0, cooking=0, delivering=0, completed=0;
-        double total = 0;
+        int pending = 0, cooking = 0, delivering = 0, completed = 0;
+
+        double confirmedTotal = 0; // tiền các món đã vào bếp
+        double pendingTotal   = 0; // tiền các món chưa xác nhận
+
+        boolean isMember = "MEMBER".equals(role) || "MEMBER".equals(o.getRoleCode());
+
         for (OrderDetail d : o.getItems()) {
             if ("CANCELLED".equals(d.getStatus())) continue;
             orderItems.add(d);
-            total += d.getUnitPrice() * d.getQuantity();
-            switch (d.getStatus()) {
-                case "PENDING_CONFIRM": pending++;    break;
-                case "COOKING":         cooking++;    break;
-                case "DELIVERING":      delivering++; break;
-                case "COMPLETED":       completed++;  break;
+            double lineTotal = d.getUnitPrice() * d.getQuantity();
+            switch (d.getStatus() != null ? d.getStatus() : "") {
+                case "PENDING_CONFIRM":
+                    pending++;
+                    pendingTotal += lineTotal;
+                    break;
+                case "COOKING":
+                    cooking++;
+                    confirmedTotal += lineTotal;
+                    break;
+                case "DELIVERING":
+                    delivering++;
+                    confirmedTotal += lineTotal;
+                    break;
+                case "COMPLETED":
+                    completed++;
+                    confirmedTotal += lineTotal;
+                    break;
             }
         }
+
+        double discountPct = isMember
+                ? DatabaseHelper.getInstance(this).getActiveMemberDiscountPercent()
+                : 0;
+        double discount      = confirmedTotal * discountPct / 100.0;
+        double displayTotal  = confirmedTotal - discount;
+
         adapter.notifyDataSetChanged();
         updateBanner(pending, cooking, delivering, completed);
+
         NumberFormat nf = NumberFormat.getNumberInstance(Locale.forLanguageTag("vi"));
-        tvStatusSummary.setText("Tổng: " + nf.format((long) total) + " đ  ·  "
-                + "Chờ:" + pending + " Nấu:" + cooking
-                + " Giao:" + delivering + " Xong:" + completed);
+        StringBuilder sb = new StringBuilder();
+        sb.append("Tổng: ").append(nf.format((long) displayTotal)).append(" đ");
+        if (isMember && discount > 0)
+            sb.append("  (tiết kiệm ").append(nf.format((long) discount)).append(" đ)");
+        if (pending > 0)
+            sb.append("\n⏳ Chờ xác nhận: ").append(nf.format((long) pendingTotal)).append(" đ (").append(pending).append(" món)");
+        sb.append("\n🍳:").append(cooking)
+          .append("  🚶:").append(delivering)
+          .append("  ✅:").append(completed);
+        tvStatusSummary.setText(sb.toString());
     }
 
     private void updateBanner(int pending, int cooking, int delivering, int completed) {
         if (pending > 0) {
-            tvOrderPhaseBanner.setText("⏳ Chờ xác nhận bàn (" + pending + " món)");
+            tvOrderPhaseBanner.setText("⏳ Chờ nhân viên xác nhận bàn (" + pending + " món)");
             tvOrderPhaseBanner.setBackgroundColor(getResources().getColor(R.color.status_pending));
         } else if (cooking > 0) {
             tvOrderPhaseBanner.setText("🍳 Đang chế biến (" + cooking + " món)");
@@ -130,23 +235,40 @@ public class OrderTrackingActivity extends AppCompatActivity {
     }
 
     private void showPaymentRequestDialog() {
-        double total = 0;
+        boolean isMember = "MEMBER".equals(role);
+        double confirmedTotal = 0;
         StringBuilder sb = new StringBuilder();
+
         for (OrderDetail d : orderItems) {
+            if ("PENDING_CONFIRM".equals(d.getStatus())) continue; // Bug #38
             double sub = d.getUnitPrice() * d.getQuantity();
-            total += sub;
+            confirmedTotal += sub;
             sb.append("• ").append(d.getItemName())
               .append(" x").append(d.getQuantity())
               .append("  =  ").append(String.format("%,.0f đ\n", sub));
         }
+
+        double discPct  = isMember
+                ? DatabaseHelper.getInstance(this).getActiveMemberDiscountPercent()
+                : 0;
+        double discount = confirmedTotal * discPct / 100.0;
+        double total    = confirmedTotal - discount;
+
+        NumberFormat nf = NumberFormat.getNumberInstance(Locale.forLanguageTag("vi"));
+        String summary  = sb.toString()
+                + "\n────────────"
+                + (isMember && discount > 0
+                   ? "\nChiết khấu thành viên (" + (int)discPct + "%): -" + nf.format((long) discount) + " đ"
+                   : "")
+                + "\nTỔNG: " + nf.format((long) total) + " đ\n\nGửi yêu cầu thanh toán?";
+
         double finalTotal = total;
-        NumberFormat nf   = NumberFormat.getNumberInstance(Locale.forLanguageTag("vi"));
         new AlertDialog.Builder(this)
                 .setTitle("Hóa đơn — " + tableName)
-                .setMessage(sb + "\n────────────\nTỔNG: " + nf.format((long) finalTotal) + " đ\n\nGửi yêu cầu thanh toán?")
+                .setMessage(summary)
                 .setPositiveButton("GỬI", (d, w) -> {
                     DatabaseHelper db = DatabaseHelper.getInstance(this);
-                    db.updateOrderStatus(orderId,  "WAITING_PAYMENT");
+                    db.updateOrderStatus(orderId, "WAITING_PAYMENT");
                     db.updateTableStatus(tableId, "WAITING_PAYMENT");
                     paymentRequested = true;
                     btnRequestPayment.setText("✅ Đã gửi yêu cầu thanh toán");
@@ -154,7 +276,8 @@ public class OrderTrackingActivity extends AppCompatActivity {
                     btnOrderMore.setEnabled(false);
                     Toast.makeText(this, "Nhân viên sẽ đến ngay!", Toast.LENGTH_LONG).show();
                 })
-                .setNegativeButton("Huỷ", null).show();
+                .setNegativeButton("Huỷ", null)
+                .show();
     }
 
     @Override protected void onDestroy() {
@@ -163,27 +286,41 @@ public class OrderTrackingActivity extends AppCompatActivity {
     }
 
     private class TrackingAdapter extends BaseAdapter {
-        @Override public int getCount() { return orderItems.size(); }
+        @Override public int getCount()          { return orderItems.size(); }
         @Override public Object getItem(int pos) { return orderItems.get(pos); }
         @Override public long getItemId(int pos) { return pos; }
-        @Override public View getView(int pos, View cv, ViewGroup parent) {
-            if (cv == null)
+
+        @Override
+        public View getView(int pos, View cv, ViewGroup parent) {
+            ViewHolder h;
+            if (cv == null) {
                 cv = LayoutInflater.from(OrderTrackingActivity.this)
                         .inflate(R.layout.item_order_tracking, parent, false);
+                h = new ViewHolder();
+                h.tvName   = cv.findViewById(R.id.tv_track_item_name);
+                h.tvQty    = cv.findViewById(R.id.tv_track_qty);
+                h.tvPrice  = cv.findViewById(R.id.tv_track_price);
+                h.tvStatus = cv.findViewById(R.id.tv_track_status);
+                cv.setTag(h);
+            } else {
+                h = (ViewHolder) cv.getTag();
+            }
             OrderDetail d = orderItems.get(pos);
-            ((TextView)cv.findViewById(R.id.tv_track_item_name)).setText(d.getItemName());
-            ((TextView)cv.findViewById(R.id.tv_track_qty)).setText("x" + d.getQuantity());
-            ((TextView)cv.findViewById(R.id.tv_track_price))
-                    .setText(String.format("%,.0f đ", d.getUnitPrice()*d.getQuantity()));
-            TextView tvSt = cv.findViewById(R.id.tv_track_status);
+            h.tvName.setText(d.getItemName());
+            h.tvQty.setText("x" + d.getQuantity());
+            h.tvPrice.setText(String.format("%,.0f đ", d.getUnitPrice() * d.getQuantity()));
             switch (d.getStatus() != null ? d.getStatus() : "") {
-                case "PENDING_CONFIRM": tvSt.setText("⏳ Chờ xác nhận"); tvSt.setTextColor(0xFFFB8C00); break;
-                case "COOKING":         tvSt.setText("🍳 Đang nấu");    tvSt.setTextColor(0xFF1976D2); break;
-                case "DELIVERING":      tvSt.setText("🚶 Đang mang lên");tvSt.setTextColor(0xFF7B1FA2); break;
-                case "COMPLETED":       tvSt.setText("✅ Đã giao");      tvSt.setTextColor(0xFF2E7D32); break;
-                default:                tvSt.setText(d.getStatus());     tvSt.setTextColor(0xFF9E9E9E);
+                case "PENDING_CONFIRM": h.tvStatus.setText("⏳ Chờ xác nhận"); h.tvStatus.setTextColor(0xFFFB8C00); break;
+                case "COOKING":         h.tvStatus.setText("🍳 Đang nấu");     h.tvStatus.setTextColor(0xFF1976D2); break;
+                case "DELIVERING":      h.tvStatus.setText("🚶 Đang mang lên");h.tvStatus.setTextColor(0xFF7B1FA2); break;
+                case "COMPLETED":       h.tvStatus.setText("✅ Đã giao");       h.tvStatus.setTextColor(0xFF2E7D32); break;
+                default:                h.tvStatus.setText(d.getStatus());      h.tvStatus.setTextColor(0xFF9E9E9E);
             }
             return cv;
+        }
+
+        class ViewHolder {
+            TextView tvName, tvQty, tvPrice, tvStatus;
         }
     }
 }

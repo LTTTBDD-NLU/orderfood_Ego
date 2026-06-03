@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Màu thương hiệu EGO - Primary: đỏ cam, Background: trắng kem -->
+    <color name="colorPrimary">#E64A19</color>
+    <color name="colorPrimaryDark">#BF360C</color>
+    <color name="colorAccent">#FF7043</color>
+    <color name="white">#FFFFFF</color>
+    <color name="background_light">#FCF9F8</color>
+    <color name="text_secondary">#757575</color>
+
+    <!-- Trạng thái bàn -->
+    <color name="table_empty">#9E9E9E</color>
+    <color name="table_occupied">#43A047</color>
+    <color name="table_waiting_payment">#E53935</color>
+
+    <!-- Trạng thái đơn hàng -->
+    <color name="status_pending">#FB8C00</color>
+    <color name="status_cooking">#1976D2</color>
+    <color name="status_delivering">#7B1FA2</color>
+    <color name="status_completed">#2E7D32</color>
+    <color name="status_cancelled">#9E9E9E</color>
+
+    <!-- Khác -->
+    <color name="note_red">#D32F2F</color>
+    <color name="staff_active">#43A047</color>
+    <color name="staff_locked">#E53935</color>
+    <color name="bottom_nav_active">#E64A19</color>
+    <color name="bottom_nav_inactive">#FFFFFF</color>
+    <color name="bottom_nav_text_inactive">#757575</color>
+</resources>

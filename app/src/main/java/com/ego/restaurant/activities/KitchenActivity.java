@@ -11,6 +11,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.ego.restaurant.R;
@@ -33,12 +34,12 @@ public class KitchenActivity extends AppCompatActivity {
     private LinearLayout tabBtnKds, tabBtnHistory, tabBtnKitchenProfile;
     private LinearLayout tabContentKds, tabContentHistory;
     private ScrollView   tabContentKitchenProfile;
-    private static final int TAB_KDS=0, TAB_HIST=1, TAB_PROF=2;
+    private static final int TAB_KDS = 0, TAB_HIST = 1, TAB_PROF = 2;
 
     private ListView  lvOrders, lvHistory;
     private TextView  tvCookingCount;
-    private ArrayList<OrderDetail>     cookingList = new ArrayList<>();
-    private ArrayList<KitchenHistoryItem> histList = new ArrayList<>();
+    private ArrayList<OrderDetail>       cookingList = new ArrayList<>();
+    private ArrayList<KitchenHistoryItem> histList   = new ArrayList<>();
     private KitchenAdapter        kitchenAdapter;
     private KitchenHistoryAdapter histAdapter;
 
@@ -48,12 +49,12 @@ public class KitchenActivity extends AppCompatActivity {
     private SessionManager sm;
     private final Handler  handler  = new Handler(Looper.getMainLooper());
     private final Runnable pollTask = new Runnable() {
-        @Override
-        public void run() {
+        @Override public void run() {
             refreshData();
             handler.postDelayed(this, 2000);
         }
     };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -81,14 +82,20 @@ public class KitchenActivity extends AppCompatActivity {
         btnKChangePwd        = findViewById(R.id.btn_kitchen_change_password);
         btnKLogout           = findViewById(R.id.btn_kitchen_logout);
 
-        kitchenAdapter = new KitchenAdapter(this, cookingList, new KitchenAdapter.OnKitchenActionListener() {
-            @Override public void onDone(OrderDetail d)       { markDone(d); }
-            @Override public void onOutOfStock(OrderDetail d) { markOutOfStock(d); }
-        });
+        kitchenAdapter = new KitchenAdapter(this, cookingList,
+                new KitchenAdapter.OnKitchenActionListener() {
+                    @Override public void onDone(OrderDetail d)       { markDone(d); }
+                    @Override public void onOutOfStock(OrderDetail d) { markOutOfStock(d); }
+                });
         lvOrders.setAdapter(kitchenAdapter);
 
         histAdapter = new KitchenHistoryAdapter(this, histList);
         lvHistory.setAdapter(histAdapter);
+
+        // Bug #36 FIX: tap vào item trong history → hỏi có muốn rollback không
+        lvHistory.setOnItemClickListener((parent, view, pos, id) -> {
+            if (pos < histList.size()) showRollbackDialog(histList.get(pos));
+        });
 
         tabBtnKds.setOnClickListener(v            -> switchTab(TAB_KDS));
         tabBtnHistory.setOnClickListener(v        -> switchTab(TAB_HIST));
@@ -110,40 +117,45 @@ public class KitchenActivity extends AppCompatActivity {
     }
 
     private void switchTab(int tab) {
-        tabContentKds.setVisibility(tab==TAB_KDS ?android.view.View.VISIBLE:android.view.View.GONE);
-        tabContentHistory.setVisibility(tab==TAB_HIST?android.view.View.VISIBLE:android.view.View.GONE);
-        tabContentKitchenProfile.setVisibility(tab==TAB_PROF?android.view.View.VISIBLE:android.view.View.GONE);
-        int on=0xFFE64A19, off=0xFF2A2A2A;
-        tabBtnKds.setBackgroundColor(tab==TAB_KDS?on:off);
-        tabBtnHistory.setBackgroundColor(tab==TAB_HIST?on:off);
-        tabBtnKitchenProfile.setBackgroundColor(tab==TAB_PROF?on:off);
+        tabContentKds.setVisibility(tab == TAB_KDS  ? android.view.View.VISIBLE : android.view.View.GONE);
+        tabContentHistory.setVisibility(tab == TAB_HIST ? android.view.View.VISIBLE : android.view.View.GONE);
+        tabContentKitchenProfile.setVisibility(tab == TAB_PROF ? android.view.View.VISIBLE : android.view.View.GONE);
+        int on = 0xFFE64A19, off = 0xFF2A2A2A;
+        tabBtnKds.setBackgroundColor(tab == TAB_KDS  ? on : off);
+        tabBtnHistory.setBackgroundColor(tab == TAB_HIST ? on : off);
+        tabBtnKitchenProfile.setBackgroundColor(tab == TAB_PROF ? on : off);
     }
 
     private void loadProfile() {
         tvKName.setText(sm.getFullName().isEmpty() ? "Nhân viên Bếp" : sm.getFullName());
         tvKRole.setText("Nhân viên Bếp");
         int days   = DatabaseHelper.getInstance(this).countAttendedDays(sm.getUserId());
-        double sal = days * 300000.0;
+        double sal = days * 300_000.0;
         NumberFormat nf = NumberFormat.getNumberInstance(Locale.forLanguageTag("vi"));
         tvKDays.setText(String.valueOf(days));
-        tvKSalary.setText(nf.format((long)sal)+"đ");
+        tvKSalary.setText(nf.format((long) sal) + "đ");
     }
 
     private void refreshData() {
+        /*
+         * Bug #43 + #49 FIX đã xử lý trong DatabaseHelper.getDetailsByStatus():
+         * INNER JOIN với Orders WHERE order_status NOT IN ('PAID','CANCELLED')
+         * → ghost COOKING items từ đơn đã PAID sẽ không hiển thị nữa
+         */
         cookingList.clear();
         cookingList.addAll(DatabaseHelper.getInstance(this).getDetailsByStatus("COOKING"));
         tvCookingCount.setText("Đang nấu: " + cookingList.size());
         kitchenAdapter.notifyDataSetChanged();
 
+        // History: DELIVERING của hôm nay
         histList.clear();
-        ArrayList<OrderDetail> delivered = DatabaseHelper.getInstance(this).getDetailsByStatus("DELIVERING");
-        ArrayList<OrderDetail> completed = DatabaseHelper.getInstance(this).getDetailsByStatus("COMPLETED");
-        delivered.addAll(completed);
+        ArrayList<OrderDetail> delivering = DatabaseHelper.getInstance(this).getDetailsByStatus("DELIVERING");
         long todayStart = getTodayStart();
         SimpleDateFormat sdf = new SimpleDateFormat("HH:mm", Locale.getDefault());
-        for (OrderDetail d : delivered) {
+        for (OrderDetail d : delivering) {
             if (d.getOrderTime() >= todayStart) {
                 histList.add(new KitchenHistoryItem(
+                        d.getDetailId(),  // Bug #36: cần detailId để rollback
                         d.getItemName(), d.getTableName(), d.getQuantity(),
                         sdf.format(new Date(d.getOrderTime()))));
             }
@@ -153,20 +165,46 @@ public class KitchenActivity extends AppCompatActivity {
 
     private void markDone(OrderDetail d) {
         DatabaseHelper.getInstance(this).updateDetailStatus(d.getDetailId(), "DELIVERING");
-        Toast.makeText(this,"✅ "+d.getItemName()+" → Bàn "+d.getTableName(),Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "✅ " + d.getItemName() + " → Bàn " + d.getTableName(),
+                Toast.LENGTH_SHORT).show();
     }
 
     private void markOutOfStock(OrderDetail d) {
-        DatabaseHelper.getInstance(this).updateDetailStatus(d.getDetailId(), "CANCELLED");
-        Toast.makeText(this,"❌ Hết: "+d.getItemName(),Toast.LENGTH_LONG).show();
+        new AlertDialog.Builder(this)
+                .setTitle("Hết món: " + d.getItemName())
+                .setMessage("Xác nhận hủy món này? Nhân viên phục vụ sẽ thông báo cho khách.")
+                .setPositiveButton("Xác nhận HẾT MÓN", (dlg, w) -> {
+                    DatabaseHelper.getInstance(this).updateDetailStatus(d.getDetailId(), "CANCELLED");
+                    Toast.makeText(this, "❌ Đã hủy: " + d.getItemName(), Toast.LENGTH_LONG).show();
+                })
+                .setNegativeButton("Đóng", null)
+                .show();
+    }
+
+    /**
+     * Bug #36 FIX: cho phép rollback DELIVERING → COOKING nếu bếp bấm nhầm
+     */
+    private void showRollbackDialog(KitchenHistoryItem item) {
+        if (item.detailId == null || item.detailId.isEmpty()) return;
+        new AlertDialog.Builder(this)
+                .setTitle("Hoàn tác?")
+                .setMessage("Bấm nhầm nút?\nĐưa \"" + item.itemName
+                        + "\" về trạng thái ĐANG NẤU?")
+                .setPositiveButton("Hoàn tác → Nấu lại", (d, w) -> {
+                    DatabaseHelper.getInstance(this).rollbackDetailToCoking(item.detailId);
+                    Toast.makeText(this, "↩ Đã hoàn tác: " + item.itemName,
+                            Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("Không", null)
+                .show();
     }
 
     private long getTodayStart() {
         java.util.Calendar c = java.util.Calendar.getInstance();
-        c.set(java.util.Calendar.HOUR_OF_DAY,0);
-        c.set(java.util.Calendar.MINUTE,0);
-        c.set(java.util.Calendar.SECOND,0);
-        c.set(java.util.Calendar.MILLISECOND,0);
+        c.set(java.util.Calendar.HOUR_OF_DAY, 0);
+        c.set(java.util.Calendar.MINUTE, 0);
+        c.set(java.util.Calendar.SECOND, 0);
+        c.set(java.util.Calendar.MILLISECOND, 0);
         return c.getTimeInMillis();
     }
 
